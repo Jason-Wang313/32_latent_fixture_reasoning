@@ -1,0 +1,4 @@
+policy,success,collisions,wrong_fixture_actions,avg_steps,avg_return,avg_belief_confidence
+geometry_only,621,1379,1379,3.689,-0.696,0.000
+reactive_failure,1612,1767,388,5.758,0.332,0.207
+latent_fixture,1995,5,5,7.077,0.871,0.941
