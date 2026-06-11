@@ -1,0 +1,133 @@
+\documentclass{article}
+\usepackage{iclr2026_conference}
+\input{math_commands.tex}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{url}
+
+\title{Latent Fixture Reasoning}
+\author{Anonymous Authors}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Assembly robots often treat support relations and fixtures as visible scene
+geometry or as constraints supplied before planning. This paper studies the
+missing case: a part fails to move because an unobserved bolt, latch, adhesive
+patch, or hidden stop is still constraining it. We propose \emph{latent fixture
+reasoning}: infer a discrete hidden fixture cause from small manipulation
+outcome residuals, then choose the release or reorientation action implied by
+that cause. A bounded literature sweep over 1168 arXiv/Crossref
+records suggests that the nearest work covers contact-rich manipulation,
+constraint reasoning, tactile inference, active perception, and fixture-aware
+assembly, but rarely treats hidden fixtures as an explicit action-selecting
+state variable. In a deterministic toy benchmark, geometry-only manipulation
+collides with many fixture modes, while latent fixture reasoning sharply
+reduces wrong release actions. The evidence is modest, but it exposes a useful
+state abstraction for robots that must learn what is holding the world in
+place by acting on it.
+\end{abstract}
+
+\section{Introduction}
+When a robot pulls on a part and it does not move, the failure is not just a
+low-level control error. It can be evidence that something unseen is holding
+the part in place. In assembly, repair, household manipulation, and field
+robotics, that hidden cause may be a bolt, a latch, adhesive, a cable, a clamp,
+or a geometric stop outside the camera view. A planner that represents only
+visible geometry can repeatedly choose unsafe or unproductive actions.
+
+We call this problem \emph{latent fixture reasoning}. The key object is an
+interpretable hidden fixture variable. It is latent because the robot does not
+observe the fixture directly. It is a fixture because it constrains motion. It
+is reasoning, rather than only prediction, because the inferred cause changes
+the next action: unbolt, unlatch, heat, reorient, or pull.
+
+The paper makes three contributions. First, it separates latent fixture causes
+from generic uncertainty in manipulation. Second, it defines a small posterior
+interface from probe residuals to fixture hypotheses. Third, it provides a
+minimal deterministic simulation showing why this state variable can reduce
+wrong fixture actions.
+
+\section{Problem}
+Let $x$ denote the visible object state and let $z$ be an unobserved fixture
+mode in $\{\mathrm{free}, \mathrm{bolt}, \mathrm{latch}, \mathrm{adhesive},
+\mathrm{stop}\}$. A robot chooses a probe action $a_p$ and observes an outcome
+residual $o$: displacement, lift compliance, twist compliance, and thermal
+softening response. The robot then chooses a task action $a_t$ from direct pull,
+unbolt, unlatch, heat-and-peel, or reorient. The central question is not whether
+the robot can predict the next state in general. It is whether $o$ identifies a
+fixture cause well enough to avoid the wrong physical release action.
+
+\section{Mechanism}
+The proposed controller maintains a small posterior over fixture modes,
+\[
+  p(z \mid o) \propto p(o \mid z)p(z).
+\]
+The likelihood model can be hand-written, learned, or calibrated from robot
+data. In this paper we use a hand-written model only to isolate the mechanism.
+The controller is allowed to perform a reversible probe before committing to a
+release action. If confidence is low, it performs an additional reversible
+probe rather than applying a high-force release action.
+
+This differs from a generic world model in two ways. First, the latent variable
+has a robotics meaning: it is a hidden support or fixture cause. Second, the
+variable is directly coupled to an action menu. A high posterior on bolt selects
+unbolt; a high posterior on adhesive selects heat-and-peel; a high posterior on
+hidden stop selects reorientation.
+
+\section{Evidence}
+We implemented a deterministic toy benchmark with 2,000 seeds. Each seed
+samples one fixture mode, generates noisy probe residuals, and evaluates three
+policies. The geometry-only policy assumes visible geometry is complete. The
+reactive policy first fails, then uses a single heuristic residual. The latent
+fixture policy infers the fixture before choosing a release action.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Policy & Success & Coll. & Wrong & Steps & Return & Conf. \\
+\midrule
+Geometry only & 621 & 1379 & 1379 & 3.689 & -0.696 & 0.000 \\
+Reactive & 1612 & 1767 & 388 & 5.758 & 0.332 & 0.207 \\
+Latent fixture & 1995 & 5 & 5 & 7.077 & 0.871 & 0.941 \\
+\bottomrule
+\end{tabular}
+\caption{Toy hidden-fixture benchmark. The mechanism is valuable when a
+visible-geometry policy cannot distinguish free motion from a hidden fixture
+constraint.}
+\end{table}
+
+The absolute numbers should not be read as benchmark performance. They show a
+mechanism: when the hidden cause selects a different release action, estimating
+that cause before committing can reduce physical mistakes.
+
+\section{Related Work Boundary}
+The literature sweep covers contact-rich manipulation, task-and-motion planning,
+tactile inference, support-relation reasoning, robot world models, and assembly
+fixture planning. These areas provide the hostile prior. The narrow boundary for
+this paper is an interpretable latent fixture graph whose nodes are not merely
+unobserved state, but action-selecting causes of constraint.
+
+\section{Limitations}
+The experiment is a toy model with hand-coded fixture types and synthetic
+residuals. It does not prove that the abstraction scales to real assemblies.
+The next required step is a physical or high-fidelity simulated benchmark where
+fixtures are hidden from perception but revealed through controlled probes.
+
+\section{Conclusion}
+Latent fixture reasoning asks robots to treat failed motion as evidence about
+what hidden support is still constraining the world. The contribution is a
+small but useful shift in representation: from visible geometry plus generic
+uncertainty to an interpretable hidden fixture cause that chooses the next safe
+manipulation action.
+
+\section*{References}
+\small
+The accompanying \texttt{docs/related\_work\_matrix.csv} contains the bounded recovery
+literature sweep used for this mechanism note.
+
+\end{document}
