@@ -25,10 +25,19 @@ constraint reasoning, tactile inference, active perception, and fixture-aware
 assembly, but rarely treats hidden fixtures as an explicit action-selecting
 state variable. In a deterministic toy benchmark, geometry-only manipulation
 collides with many fixture modes, while latent fixture reasoning sharply
-reduces wrong release actions. The evidence is modest, but it exposes a useful
-state abstraction for robots that must learn what is holding the world in
-place by acting on it.
+reduces wrong release actions when the hidden fixture belongs to the known
+taxonomy. A v2 out-of-taxonomy stress shows the boundary: an unseen cable-tie
+fixture causes forced known-taxonomy inference to fail in all 2,000 seeds, and
+a guarded detector avoids nearly all damage only by abstaining. The evidence is
+modest, but it exposes a useful state abstraction for robots that must learn
+what is holding the world in place by acting on it.
 \end{abstract}
+
+\paragraph{V2 hardening note.}
+This version narrows the claim. Latent fixture reasoning is not a universal
+unknown-constraint solver. The mechanism is supported only when the fixture
+taxonomy and release-action menu are calibrated, or when the robot is allowed
+to abstain on out-of-distribution residuals.
 
 \section{Introduction}
 When a robot pulls on a part and it does not move, the failure is not just a
@@ -52,13 +61,16 @@ wrong fixture actions.
 
 \section{Problem}
 Let $x$ denote the visible object state and let $z$ be an unobserved fixture
-mode in $\{\mathrm{free}, \mathrm{bolt}, \mathrm{latch}, \mathrm{adhesive},
+mode in a calibrated set
+$\{\mathrm{free}, \mathrm{bolt}, \mathrm{latch}, \mathrm{adhesive},
 \mathrm{stop}\}$. A robot chooses a probe action $a_p$ and observes an outcome
 residual $o$: displacement, lift compliance, twist compliance, and thermal
 softening response. The robot then chooses a task action $a_t$ from direct pull,
 unbolt, unlatch, heat-and-peel, or reorient. The central question is not whether
 the robot can predict the next state in general. It is whether $o$ identifies a
-fixture cause well enough to avoid the wrong physical release action.
+fixture cause well enough to avoid the wrong physical release action. If the
+true fixture is outside the calibrated set, the safe target behavior is
+abstention or additional diagnosis, not confident release.
 
 \section{Mechanism}
 The proposed controller maintains a small posterior over fixture modes,
@@ -69,7 +81,10 @@ The likelihood model can be hand-written, learned, or calibrated from robot
 data. In this paper we use a hand-written model only to isolate the mechanism.
 The controller is allowed to perform a reversible probe before committing to a
 release action. If confidence is low, it performs an additional reversible
-probe rather than applying a high-force release action.
+probe rather than applying a high-force release action. In the hardened v2
+stress, we also expose a simple distance-to-known-prototype guard: residuals
+far from every known fixture prototype are treated as out-of-taxonomy and
+should trigger abstention.
 
 This differs from a generic world model in two ways. First, the latent variable
 has a robotics meaning: it is a hidden support or fixture cause. Second, the
@@ -105,6 +120,18 @@ The absolute numbers should not be read as benchmark performance. They show a
 mechanism: when the hidden cause selects a different release action, estimating
 that cause before committing can reduce physical mistakes.
 
+\subsection{V2 out-of-taxonomy stress}
+The hostile reviewer attack is taxonomy misspecification. The v1 controller
+knows only free, bolt, latch, adhesive, and hidden-stop modes. We add a
+``cable-tie'' fixture whose residual signature is outside that menu and whose
+correct action is also absent from the release menu. A forced latent-fixture
+classifier must map it to a known class, so every committed release is wrong.
+The guarded variant checks distance from the nearest known prototype and can
+avoid damage only by refusing to act. Table~\ref{tab:unknown-fixture-stress}
+therefore reports a negative result, not a new success claim.
+
+\input{docs/unknown_fixture_stress_table.tex}
+
 \section{Related Work Boundary}
 The literature sweep covers contact-rich manipulation, task-and-motion planning,
 tactile inference, support-relation reasoning, robot world models, and assembly
@@ -114,9 +141,12 @@ unobserved state, but action-selecting causes of constraint.
 
 \section{Limitations}
 The experiment is a toy model with hand-coded fixture types and synthetic
-residuals. It does not prove that the abstraction scales to real assemblies.
-The next required step is a physical or high-fidelity simulated benchmark where
-fixtures are hidden from perception but revealed through controlled probes.
+residuals. It does not prove that the abstraction scales to real assemblies,
+and the v2 stress shows that the method is brittle when the true fixture class
+or required release action is missing from the taxonomy. The next required step
+is a physical or high-fidelity simulated benchmark where fixtures are hidden
+from perception, revealed through controlled probes, and sometimes outside the
+training taxonomy.
 
 \section{Conclusion}
 Latent fixture reasoning asks robots to treat failed motion as evidence about

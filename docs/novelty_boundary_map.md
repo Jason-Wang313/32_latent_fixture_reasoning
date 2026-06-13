@@ -12,3 +12,4 @@ Outside the boundary:
 - Generic latent world models without fixture semantics.
 - Fixture-aware assembly planning when the fixture is already specified.
 - Pure tactile material classification without a downstream manipulation-mode choice.
+- Unknown fixture discovery when the taxonomy and action menu are incomplete.
