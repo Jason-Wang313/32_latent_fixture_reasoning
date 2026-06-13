@@ -3,6 +3,7 @@ import math
 import random
 import re
 import shutil
+import sys
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -50,6 +51,10 @@ MEANS = {
     "latch": (0.20, 0.10, 0.66, 0.16),
     "adhesive": (0.12, 0.30, 0.22, 0.82),
     "hidden_stop": (0.34, 0.12, 0.16, 0.12),
+}
+
+UNKNOWN_MEANS = {
+    "cable_tie": (0.55, 0.58, 0.52, 0.55),
 }
 
 
@@ -227,19 +232,125 @@ def observe(kind, rng):
 
 
 def infer_fixture(obs):
+    best, confidence, _ = infer_fixture_details(obs)
+    return best, confidence
+
+
+def infer_fixture_details(obs):
     best = None
     best_score = -1e9
     second_score = -1e9
+    best_distance = 1e9
     for kind, mean in MEANS.items():
-        score = -sum((a - b) ** 2 for a, b in zip(obs, mean))
+        sq_distance = sum((a - b) ** 2 for a, b in zip(obs, mean))
+        score = -sq_distance
         if score > best_score:
             second_score = best_score
             best_score = score
             best = kind
+            best_distance = math.sqrt(sq_distance)
         elif score > second_score:
             second_score = score
     confidence = 1.0 / (1.0 + math.exp(-18.0 * (best_score - second_score)))
-    return best, confidence
+    return best, confidence, best_distance
+
+
+def observe_unknown(kind, rng):
+    values = []
+    for mean in UNKNOWN_MEANS[kind]:
+        values.append(max(0.0, min(1.0, rng.gauss(mean, 0.08))))
+    return tuple(values)
+
+
+def format_stress_policy(policy):
+    labels = {
+        "forced_known_taxonomy": "Forced known taxonomy",
+        "guarded_unknown_detector": "Guarded unknown detector",
+    }
+    return labels[policy]
+
+
+def write_unknown_fixture_stress_table(rows):
+    body = []
+    for row in rows:
+        body.append(
+            f"{format_stress_policy(row['policy'])} & "
+            f"{row['success']} & {row['collisions']} & {row['wrong_fixture_actions']} & "
+            f"{row['abstentions']} & {row['avg_belief_confidence']} & {row['avg_min_distance']} \\\\"
+        )
+    table = (
+        "\\begin{table}[h]\n"
+        "\\centering\n"
+        "\\small\n"
+        "\\begin{tabular}{lrrrrrr}\n"
+        "\\toprule\n"
+        "Policy & Success & Coll. & Wrong & Abst. & Conf. & Dist. \\\\\n"
+        "\\midrule\n"
+        + "\n".join(body)
+        + "\n\\bottomrule\n"
+        "\\end{tabular}\n"
+        "\\caption{V2 out-of-taxonomy fixture stress. The hidden cable-tie mode is "
+        "not in the known fixture taxonomy and requires an action absent from the "
+        "known release menu. A forced latent-fixture classifier commits to a known "
+        "release action and fails; a guarded policy avoids damage only by abstaining.}\n"
+        "\\label{tab:unknown-fixture-stress}\n"
+        "\\end{table}\n"
+    )
+    (DOCS / "unknown_fixture_stress_table.tex").write_text(table, encoding="utf-8")
+
+
+def run_unknown_fixture_stress():
+    fields = [
+        "policy",
+        "success",
+        "collisions",
+        "wrong_fixture_actions",
+        "abstentions",
+        "avg_belief_confidence",
+        "avg_min_distance",
+    ]
+    policies = ["forced_known_taxonomy", "guarded_unknown_detector"]
+    rows = []
+    for policy in policies:
+        collisions = wrong = abstentions = success = 0
+        total_confidence = 0.0
+        total_distance = 0.0
+        for seed in range(2000):
+            rng = random.Random(32000 + seed)
+            obs = observe_unknown("cable_tie", rng)
+            _, confidence, min_distance = infer_fixture_details(obs)
+            total_confidence += confidence
+            total_distance += min_distance
+
+            if policy == "forced_known_taxonomy":
+                collisions += 1
+                wrong += 1
+                continue
+
+            if min_distance > 0.35 or confidence < 0.78:
+                abstentions += 1
+            else:
+                collisions += 1
+                wrong += 1
+
+        rows.append(
+            {
+                "policy": policy,
+                "success": success,
+                "collisions": collisions,
+                "wrong_fixture_actions": wrong,
+                "abstentions": abstentions,
+                "avg_belief_confidence": f"{total_confidence / 2000.0:.3f}",
+                "avg_min_distance": f"{total_distance / 2000.0:.3f}",
+            }
+        )
+
+    with (DOCS / "unknown_fixture_stress.csv").open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+    write_unknown_fixture_stress_table(rows)
+    return rows
 
 
 def run_policy(policy, seed):
@@ -643,4 +754,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if "--unknown-stress-only" in sys.argv:
+        run_unknown_fixture_stress()
+    else:
+        main()
