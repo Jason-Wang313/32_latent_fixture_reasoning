@@ -1,6 +1,10 @@
-# Plan
-1. Build a 1000-paper landscape sweep from OpenAlex and nearby sources, then normalize it into `docs/related_work_matrix.csv`.
-2. Narrow to a 300-paper serious skim and a 200-250-paper deep read, then build a 100-paper hostile prior-work set.
-3. Infer the strongest field box, hidden assumptions, novelty boundary, claims, and reviewer attacks from the literature evidence.
-4. Draft the anonymous ICLR-style paper, compile the PDF, and place the final copy at `C:/Users/wangz/Downloads/32.pdf`.
-5. Publish the repo state, push it to the public GitHub repo `32_latent_fixture_reasoning`, and write the final audit with honest readiness and evidence status.
+# Paper32 v3 Execution Plan
+
+1. Preserve the honest v2 boundary: latent fixture reasoning helps only when the taxonomy, unknown detector, probe set, and release-action menu are calibrated.
+2. Scale the evidence beyond the original toy benchmark with a RAM-light full-scale synthetic suite.
+3. Cover 8 fixture families, 10 regimes, 12 policies, 80 deterministic seeds, and 160 represented decisions per seed.
+4. Add baselines and controls: geometry-only, reactive-after-failure, nearest known fixture, posterior belief, guarded abstention, active probing, sequential diagnosis, POMDP-style belief, generic latent classifier, oracle, over-abstention, and random probing.
+5. Report separate success, damage, wrong-release, abstention, probe, utility, and oracle-gap metrics.
+6. Generate manuscript tables, figures, aggregate CSVs, seed CSVs, summary JSON, and a representative trace.
+7. Expand the manuscript into a final 25+ page paper with real technical content, not padding.
+8. Build only the final accepted manuscript to `C:/Users/wangz/Downloads/32.pdf`, remove local `main.pdf`, verify PDF text and build logs, then commit and push.

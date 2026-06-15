@@ -1,17 +1,26 @@
 # Reproducibility Checklist
 
-- [x] Main simulator and recovery script is `scripts/recover_paper32.py`.
+- [x] Full-scale runner is `scripts/run_full_scale_fixture_suite.py`.
+- [x] Legacy v2 recovery/stress script remains `scripts/recover_paper32.py`.
 - [x] Build script is `scripts/build_pdf.ps1`.
-- [x] Main output is `docs/latent_fixture_results.csv`.
-- [x] V2 outputs are `docs/unknown_fixture_stress.csv` and `docs/unknown_fixture_stress_table.tex`.
-- [x] Paper source is `main.tex`.
-- [x] Canonical PDF path is `C:/Users/wangz/Downloads/32.pdf`.
+- [x] Main paper source is `main.tex`.
+- [x] Full-scale output directory is `results/full_scale/`.
+- [x] Figure directory is `figures/full_scale/`.
+- [x] Final PDF path is `C:/Users/wangz/Downloads/32.pdf`.
+- [x] Final PDF has 26 pages.
+- [x] Final PDF SHA256 is `966FB6334A0CD0CD0EF568AA65D7C6E2B8B17F8C08C44AAC8B1936B326D2454C`.
 - [x] Local `main.pdf` is removed after canonical copy.
 - [x] Visible Desktop PDF copies are absent.
+- [x] Build status is written locally to ignored `data/build_status.json`.
+- [x] Stable validation facts are recorded in `results/full_scale/validation.json`.
 
 Recommended verification commands:
 
 ```powershell
-python scripts\recover_paper32.py --unknown-stress-only
+python scripts\run_full_scale_fixture_suite.py
 powershell -ExecutionPolicy Bypass -File scripts\build_pdf.ps1
+pdfinfo C:\Users\wangz\Downloads\32.pdf
+Get-FileHash -Algorithm SHA256 C:\Users\wangz\Downloads\32.pdf
+pdftotext C:\Users\wangz\Downloads\32.pdf - | Select-String -Pattern 'v3 final full-scale|12,288,000|33.3|93.1'
+Select-String -Path build_pdflatex2.log -Pattern 'Overfull|LaTeX Warning: Reference|undefined citations|There were undefined|Fatal error|^!'
 ```

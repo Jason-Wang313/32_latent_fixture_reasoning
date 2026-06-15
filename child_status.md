@@ -1,23 +1,31 @@
 # Child Status 32
 
-Status: v2 hardened by orchestrator
+Status: v3 final full-scale submission-hardened
 Original child attempts: 2
 Original failure cause: OpenAlex HTTP 429 during literature collection; no PDF was produced by child attempts.
 
 Recovery end time: 2026-06-11 23:15:00 +01:00
 V2 hardening time: 2026-06-13 06:37:49 +01:00
-Recovery and hardening actions:
-- Used bounded arXiv/Crossref literature recovery to produce `docs/related_work_matrix.csv`.
-- Generated required docs and deterministic latent-fixture benchmark.
-- Generated `main.tex` and copied local ICLR 2026 style files.
-- Compiled `main.tex` twice with `pdflatex -interaction=nonstopmode -halt-on-error`.
-- Added v2 out-of-taxonomy cable-tie stress in `scripts/recover_paper32.py`.
-- Generated `docs/unknown_fixture_stress.csv` and `docs/unknown_fixture_stress_table.tex`.
-- Added `scripts/build_pdf.ps1` to copy only to `C:\Users\wangz\Downloads\32.pdf` and remove local `main.pdf`.
-- Removed stale Desktop-artifact language from the audit trail.
+V3 full-scale hardening time: 2026-06-15
 
-PDF exists: True
-Downloads PDF: C:\Users\wangz\Downloads\32.pdf
-Desktop PDF: absent
-Local paper PDF: absent after v2 build
-GitHub URL: https://github.com/Jason-Wang313/32_latent_fixture_reasoning
+## Final Actions
+
+- Wrote `docs/full_scale_execution_plan.md` before substantive v3 edits.
+- Added `scripts/run_full_scale_fixture_suite.py`.
+- Ran the full-scale suite: 8 families, 10 regimes, 12 methods, 80 seeds, and 12,288,000 represented decisions.
+- Generated seed metrics, aggregate metrics, summary JSON, representative trace, table snippets, and vector figures under `results/full_scale/` and `figures/full_scale/`.
+- Rewrote `main.tex` as a v3 final full-scale manuscript with explicit unknown-fixture, partial-action-menu, sequential-fixture, free-control, calibration, safety, and reviewer-attack sections.
+- Compiled with the canonical build script and copied only the final PDF to `C:/Users/wangz/Downloads/32.pdf`.
+- Removed local `main.pdf` after the canonical copy.
+- Verified final PDF text contains `v3 final full-scale`, `12,288,000`, `33.3`, and `93.1`.
+- Verified serious build-log scan has no overfull boxes, unresolved references, undefined citations, fatal errors, or TeX error lines.
+
+## Final PDF
+
+- Downloads PDF: `C:/Users/wangz/Downloads/32.pdf`
+- Pages: 26
+- Size: 338,643 bytes
+- SHA256: `966FB6334A0CD0CD0EF568AA65D7C6E2B8B17F8C08C44AAC8B1936B326D2454C`
+- Desktop PDF: absent
+- Local paper PDF: absent after final build
+- GitHub URL: `https://github.com/Jason-Wang313/32_latent_fixture_reasoning`

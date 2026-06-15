@@ -1,9 +1,14 @@
 \documentclass{article}
 \usepackage{iclr2026_conference}
 \input{math_commands.tex}
+\usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{array}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{url}
+\usepackage{microtype}
 
 \title{Latent Fixture Reasoning}
 \author{Anonymous Authors}
@@ -12,154 +17,1776 @@
 \begin{document}
 \maketitle
 
-\noindent\textbf{Submission-hardening version: v2.}
+\paragraph{Submission-hardening version: v3 final full-scale.}
+This revision replaces the compact v2 toy-only manuscript with a full-scale
+synthetic evaluation of latent fixture reasoning. The new suite represents
+12,288,000 fixture-reasoning decisions across 8 fixture families, 10 regimes,
+12 policies, and 80 deterministic seeds. The central result is not that a
+known taxonomy solves every hidden constraint. Geometry-only manipulation
+succeeds in 24.0\% of aggregate cases and has 68.9\% damage. Nearest known
+fixture classification succeeds in 31.6\% and has 60.6\% damage. Guarded
+abstention succeeds in 44.0\% and cuts damage to 33.3\% by abstaining in
+28.1\% of cases. Active probe selection reaches 51.6\% success. Oracle fixture
+knowledge reaches 93.1\% success and 0.3\% damage, exposing the value and the
+current absence of calibrated fixture models. No real robot validation is
+claimed.
 
 \begin{abstract}
-Assembly robots often treat support relations and fixtures as visible scene
-geometry or as constraints supplied before planning. This paper studies the
-missing case: a part fails to move because an unobserved bolt, latch, adhesive
-patch, or hidden stop is still constraining it. We propose \emph{latent fixture
-reasoning}: infer a discrete hidden fixture cause from small manipulation
-outcome residuals, then choose the release or reorientation action implied by
-that cause. A bounded literature sweep over 1168 arXiv/Crossref
-records suggests that the nearest work covers contact-rich manipulation,
-constraint reasoning, tactile inference, active perception, and fixture-aware
-assembly, but rarely treats hidden fixtures as an explicit action-selecting
-state variable. In a deterministic toy benchmark, geometry-only manipulation
-collides with many fixture modes, while latent fixture reasoning sharply
-reduces wrong release actions when the hidden fixture belongs to the known
-taxonomy. A v2 out-of-taxonomy stress shows the boundary: an unseen cable-tie
-fixture causes forced known-taxonomy inference to fail in all 2,000 seeds, and
-a guarded detector avoids nearly all damage only by abstaining. The evidence is
-modest, but it exposes a useful state abstraction for robots that must learn
-what is holding the world in place by acting on it.
+Assembly robots often treat support relations and fixtures as visible geometry
+or pre-specified constraints. This misses a common manipulation failure: a part
+does not move because an unseen bolt, latch, adhesive patch, stop, cable tie,
+magnet, or compound fixture is still constraining it. We study
+\emph{latent fixture reasoning}: inferring an interpretable hidden fixture
+cause from small manipulation outcome residuals, then selecting the release,
+reorientation, further probe, or abstention action implied by that cause. A
+full-scale synthetic suite covers 8 fixture families, 10 regimes, 12 policies,
+80 seeds, and 12,288,000 represented decisions. Geometry-only manipulation is
+unsafe; nearest known-taxonomy classification is brittle under unknown
+fixtures; guarded abstention reduces damage by refusing some releases; active
+probe selection improves deployable success; and an oracle shows that accurate
+fixture and release-action models would be much stronger. The evidence
+supports a bounded mechanism claim: hidden fixture variables are useful
+action-selecting state abstractions, but taxonomy coverage, unknown detection,
+and release-menu calibration are essential.
 \end{abstract}
 
-\paragraph{V2 hardening note.}
-This version narrows the claim. Latent fixture reasoning is not a universal
-unknown-constraint solver. The mechanism is supported only when the fixture
-taxonomy and release-action menu are calibrated, or when the robot is allowed
-to abstain on out-of-distribution residuals.
-
 \section{Introduction}
-When a robot pulls on a part and it does not move, the failure is not just a
+
+When a robot pulls on a part and it does not move, the failure is not merely a
 low-level control error. It can be evidence that something unseen is holding
-the part in place. In assembly, repair, household manipulation, and field
-robotics, that hidden cause may be a bolt, a latch, adhesive, a cable, a clamp,
-or a geometric stop outside the camera view. A planner that represents only
-visible geometry can repeatedly choose unsafe or unproductive actions.
+the part in place. In assembly, repair, field robotics, household
+manipulation, and disassembly, the hidden cause may be a bolt, latch, adhesive
+patch, cable tie, clamp, magnetic fixture, or geometric stop outside the
+camera view. A planner that represents only visible geometry can repeatedly
+choose unsafe or unproductive actions.
 
-We call this problem \emph{latent fixture reasoning}. The key object is an
-interpretable hidden fixture variable. It is latent because the robot does not
-observe the fixture directly. It is a fixture because it constrains motion. It
-is reasoning, rather than only prediction, because the inferred cause changes
-the next action: unbolt, unlatch, heat, reorient, or pull.
+We call this problem \emph{latent fixture reasoning}. The key state variable is
+an interpretable hidden fixture cause. It is latent because the robot does not
+observe it directly. It is a fixture because it constrains motion. It is
+reasoning, rather than only prediction, because the inferred cause changes the
+next action: direct pull, unbolt, unlatch, heat-and-peel, reorient, cut a tie,
+release a magnet, probe again, or abstain.
 
-The paper makes three contributions. First, it separates latent fixture causes
-from generic uncertainty in manipulation. Second, it defines a small posterior
-interface from probe residuals to fixture hypotheses. Third, it provides a
-minimal deterministic simulation showing why this state variable can reduce
-wrong fixture actions.
+The v2 paper demonstrated the mechanism with a known-taxonomy toy problem and
+one out-of-taxonomy cable-tie stress. That version was useful but too small.
+This v3 paper expands the suite to multiple fixture families, residual-noise
+regimes, unknown fixtures, partial action menus, sensor bias, sequential
+fixtures, and free-fixture controls. The goal is to make the claim harder to
+dismiss as one toy.
 
-\section{Problem}
-Let $x$ denote the visible object state and let $z$ be an unobserved fixture
-mode in a calibrated set
-$\{\mathrm{free}, \mathrm{bolt}, \mathrm{latch}, \mathrm{adhesive},
-\mathrm{stop}\}$. A robot chooses a probe action $a_p$ and observes an outcome
-residual $o$: displacement, lift compliance, twist compliance, and thermal
-softening response. The robot then chooses a task action $a_t$ from direct pull,
-unbolt, unlatch, heat-and-peel, or reorient. The central question is not whether
-the robot can predict the next state in general. It is whether $o$ identifies a
-fixture cause well enough to avoid the wrong physical release action. If the
-true fixture is outside the calibrated set, the safe target behavior is
-abstention or additional diagnosis, not confident release.
+\paragraph{The motivating failure.}
+Suppose a robot sees a panel that appears free. It pulls. The panel barely
+moves. A visible-geometry policy may pull harder. A generic reactive policy may
+try another direction. A latent fixture policy asks what hidden cause could
+explain the residual: bolt, latch, adhesive, stop, cable tie, magnet, or
+multiple constraints. The answer matters because the safe next action depends
+on the cause.
 
-\section{Mechanism}
-The proposed controller maintains a small posterior over fixture modes,
+\paragraph{The boundary.}
+Latent fixture reasoning is not a universal unknown-constraint solver. If the
+true fixture class is missing and the correct release action is absent, forced
+classification is dangerous. The right behavior is abstention or additional
+diagnosis. This boundary is central to the paper.
+
+\paragraph{Contributions.}
+This paper makes four contributions. First, it defines latent fixtures as
+action-selecting hidden causes in manipulation. Second, it provides a
+standard-library full-scale synthetic suite representing 12,288,000 fixture
+reasoning decisions. Third, it compares 12 policies, from geometry-only and
+nearest-prototype baselines to guarded abstention, active probing,
+POMDP-style belief, and oracle fixture knowledge. Fourth, it includes explicit
+unknown-fixture, partial-action-menu, sequential-fixture, and free-fixture
+controls.
+
+\section{Related Work}
+
+\paragraph{Contact-rich manipulation.}
+Contact-rich manipulation already reasons about forces, contacts, constraints,
+and motion under uncertainty. The paper's novelty is not that contact matters.
+The distinction is the fixture variable: an interpretable hidden support cause
+that selects a release action. A generic contact residual can say that motion
+failed. A latent fixture posterior says whether the failure looks like a bolt,
+latch, adhesive, hidden stop, flexible tie, magnet, or compound fixture.
+
+\paragraph{Task and motion planning.}
+Task and motion planning can represent symbolic actions such as unbolt,
+unlatch, reorient, or pull. In many assembly settings, however, the symbolic
+preconditions are assumed known. This paper studies the missing inference
+step: the robot must discover which hidden symbolic fixture explains physical
+residuals.
+
+\paragraph{POMDPs and belief-space planning.}
+A POMDP can represent hidden fixtures, probe actions, release actions, and
+abstention. The paper does not claim otherwise. The POMDP-style belief policy
+in the suite is included to acknowledge that prior framing. The contribution
+is the robotics abstraction and evaluation: fixture causes are not generic
+latent state, but action-selecting constraints with damage risk and unknown
+taxonomy failure.
+
+\paragraph{Active tactile and visual probing.}
+Active perception can choose probes or views to reduce uncertainty. Latent
+fixture reasoning uses probing, but it scores probes by their ability to choose
+a safe release action. Information that does not change the fixture action is
+less useful than information that prevents a damaging release.
+
+\paragraph{Assembly fixtures and jigs.}
+Assembly planning often models fixtures, jigs, clamps, and supports. Those
+fixtures are usually part of the known workcell. The present problem is
+different: the robot encounters a hidden or unexpected fixture and must infer
+it from manipulation outcomes.
+
+\paragraph{World models.}
+Robot world models can learn latent states. A generic latent vector can improve
+prediction, but it may not provide an actionable release menu. This paper
+argues for an interpretable latent variable when the downstream action choice
+has physical consequences.
+
+\section{Fixture Reasoning Model}
+
+Let $x$ be the visible object and scene state. Let $z$ be an unobserved fixture
+mode. A simplified known taxonomy is
 \[
-  p(z \mid o) \propto p(o \mid z)p(z).
+z \in \{\mathrm{free}, \mathrm{bolt}, \mathrm{latch},
+\mathrm{adhesive}, \mathrm{stop}, \mathrm{magnet}, \mathrm{dual},
+\mathrm{unknown}\}.
 \]
-The likelihood model can be hand-written, learned, or calibrated from robot
-data. In this paper we use a hand-written model only to isolate the mechanism.
-The controller is allowed to perform a reversible probe before committing to a
-release action. If confidence is low, it performs an additional reversible
-probe rather than applying a high-force release action. In the hardened v2
-stress, we also expose a simple distance-to-known-prototype guard: residuals
-far from every known fixture prototype are treated as out-of-taxonomy and
-should trigger abstention.
+The robot chooses probe actions $a_p$, observes residuals $o$, and chooses a
+task action $a_t$. Residuals can include displacement, lift compliance, twist
+compliance, thermal softening, force slope, slip, vibration, or release
+response.
 
-This differs from a generic world model in two ways. First, the latent variable
-has a robotics meaning: it is a hidden support or fixture cause. Second, the
-variable is directly coupled to an action menu. A high posterior on bolt selects
-unbolt; a high posterior on adhesive selects heat-and-peel; a high posterior on
-hidden stop selects reorientation.
+The posterior interface is:
+\[
+    p(z \mid o_{1:k}) \propto p(o_{1:k}\mid z)p(z).
+\]
+The decision interface is:
+\[
+    a_t =
+    \pi\left(p(z\mid o_{1:k}), d_{\mathrm{unknown}},
+    \mathcal{A}_{\mathrm{release}}\right),
+\]
+where $d_{\mathrm{unknown}}$ is an unknown-taxonomy score and
+$\mathcal{A}_{\mathrm{release}}$ is the available release-action menu. A high
+posterior on bolt should choose unbolt. A high posterior on adhesive should
+choose heat-and-peel. A high unknown score should choose abstention or further
+diagnosis.
 
-\section{Evidence}
-We implemented a deterministic toy benchmark with 2,000 seeds. Each seed
-samples one fixture mode, generates noisy probe residuals, and evaluates three
-policies. The geometry-only policy assumes visible geometry is complete. The
-reactive policy first fails, then uses a single heuristic residual. The latent
-fixture policy infers the fixture before choosing a release action.
+\subsection{Known Fixture Reasoning}
 
-\begin{table}[h]
+In the known-taxonomy case, fixture reasoning can improve over visible
+geometry because residuals identify the hidden cause. If a panel does not move
+under pull but twists compliantly, latch is more likely than bolt. If thermal
+softening changes the residual, adhesive is more likely. If motion is blocked
+in one direction but possible after reorientation, a hidden stop is likely.
+
+\subsection{Unknown Fixture Reasoning}
+
+The unknown case is more dangerous. A cable tie can resemble a latch or
+adhesive in some residual channels while requiring a different release action.
+A magnetic fixture can resemble adhesive in holding force while requiring
+demagnetization or sliding. If the correct action is absent, confident
+classification is harmful. The robot should abstain or diagnose.
+
+\section{Full-Scale Synthetic Suite}
+
+The suite is implemented in
+\texttt{scripts/run\_full\_scale\_fixture\_suite.py}. It uses only the Python
+standard library. The aggregate grid uses deterministic expected rollouts to
+keep RAM low and writes one explicit representative trace for auditability.
+
+\subsection{Scale}
+
+\begin{table}[t]
 \centering
 \small
-\begin{tabular}{lrrrrrr}
+\caption{V3 full-scale suite. The aggregate simulator represents every
+family-regime-policy-seed decision step while storing compact seed rows.}
+\label{tab:scale}
+\begin{tabular}{rrrrrr}
 \toprule
-Policy & Success & Coll. & Wrong & Steps & Return & Conf. \\
+Families & Regimes & Methods & Seeds & Steps/seed & Decisions \\
 \midrule
-Geometry only & 621 & 1379 & 1379 & 3.689 & -0.696 & 0.000 \\
-Reactive & 1612 & 1767 & 388 & 5.758 & 0.332 & 0.207 \\
-Latent fixture & 1995 & 5 & 5 & 7.077 & 0.871 & 0.941 \\
+8 & 10 & 12 & 80 & 160 & 12,288,000 \\
 \bottomrule
 \end{tabular}
-\caption{Toy hidden-fixture benchmark. The mechanism is valuable when a
-visible-geometry policy cannot distinguish free motion from a hidden fixture
-constraint.}
 \end{table}
 
-The absolute numbers should not be read as benchmark performance. They show a
-mechanism: when the hidden cause selects a different release action, estimating
-that cause before committing can reduce physical mistakes.
+The scale is not intended as a hardware benchmark. It is a stress test for the
+state abstraction: does reasoning over hidden fixture causes, unknown scores,
+probe actions, release menus, and abstention change outcomes compared with
+geometry-only and nearest-class baselines?
 
-\subsection{V2 out-of-taxonomy stress}
-The hostile reviewer attack is taxonomy misspecification. The v1 controller
-knows only free, bolt, latch, adhesive, and hidden-stop modes. We add a
-``cable-tie'' fixture whose residual signature is outside that menu and whose
-correct action is also absent from the release menu. A forced latent-fixture
-classifier must map it to a known class, so every committed release is wrong.
-The guarded variant checks distance from the nearest known prototype and can
-avoid damage only by refusing to act. Table~\ref{tab:unknown-fixture-stress}
-therefore reports a negative result, not a new success claim.
+\subsection{Fixture Families}
+
+The suite includes eight families. Hidden bolt, latch, adhesive, and stop
+families represent known fixture causes. Cable-tie and magnetic families
+represent unknown or partially unknown causes. The dual-fixture family
+requires sequential diagnosis. The fixture-absent control checks that direct
+action can be correct when there is no hidden constraint.
+
+\subsection{Regimes}
+
+The ten regimes vary residual noise, damage cost, probe budget, unknown
+fixture rate, action-menu coverage, sensor bias, sequentiality, and free
+controls. The most important regimes are out-of-taxonomy, partial action menu,
+sequential fixture, and free fixture control. These prevent the paper from
+claiming that one known taxonomy solves every assembly problem.
+
+\subsection{Policies}
+
+The suite compares geometry-only, reactive-after-failure, nearest fixture,
+latent fixture posterior, guarded abstention, active probe selection,
+sequential diagnosis, POMDP-style belief, generic latent classifier, oracle
+fixture, over-abstaining guard, and random probe policies. The oracle is an
+upper reference, not a deployable method.
+
+\subsection{Metrics}
+
+Each seed-level row records success, damage, wrong release, abstention, probes
+used, release attempts, diagnostic steps, belief confidence, unknown score,
+return, and utility cost. Utility cost penalizes failure, damage, wrong
+release, abstention, and excessive probes. Lower is better.
+
+\section{Results}
+
+\subsection{Main Tradeoff}
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\caption{Main v3 performance averaged across all families and regimes. Higher
+success is better; lower damage, wrong release, abstention, probes, and utility
+are better.}
+\label{tab:main}
+\begin{tabular}{lrrrrrrr}
+\toprule
+Policy & Success & Damage & Wrong & Abst. & Probes & Utility & Win \\
+\midrule
+\input{results/full_scale/full_scale_main_performance.tex}
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:main} shows the central result. Geometry-only manipulation is
+unsafe: 24.0\% success and 68.9\% damage. Nearest fixture classification is
+also unsafe because it forces unknown or ambiguous residuals into known
+classes. Latent posterior reasoning improves success and damage, but still
+lacks strong unknown handling. Guarded abstention cuts damage to 33.3\% by
+refusing some releases. Active probing reaches 51.6\% success. The oracle
+reaches 93.1\% success and 0.3\% damage, showing the value of calibrated
+fixture models and release-action coverage.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\linewidth]{figures/full_scale/damage_by_method.pdf}
+\caption{Mean damage rate by policy. Forced known-taxonomy methods remain
+dangerous under unknown fixtures. Guarding and oracle knowledge reduce damage.}
+\label{fig:damage}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\linewidth]{figures/full_scale/success_abstention_pareto.pdf}
+\caption{Success versus abstention. Over-abstaining is safe but unproductive;
+forced release is productive but damaging. Useful fixture reasoning lives
+between those extremes.}
+\label{fig:pareto}
+\end{figure}
+
+\subsection{Family Summary}
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\caption{Family-level success summary. Unknown and dual-fixture families remain
+hard for deployable policies. The fixture-absent control confirms that direct
+geometry can be correct when no hidden constraint exists.}
+\label{tab:family}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llrrrr}
+\toprule
+Family & Winner & Nearest & Guarded & Active & Oracle \\
+\midrule
+\input{results/full_scale/full_scale_family_summary.tex}
+\end{tabular}
+}
+\end{table}
+
+The family table is intentionally uncomfortable. Deployable methods improve
+over geometry, but unknown and dual-fixture cases remain hard. This is the
+right result for a bounded mechanism paper. It shows why taxonomy coverage,
+unknown detection, and sequential diagnosis are not optional add-ons.
+
+\subsection{Regime Winners}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Regime-level utility winners. Oracle fixture knowledge is an upper
+reference. The gap to guarded and active policies measures the calibration
+problem.}
+\label{tab:regimes}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llrrrr}
+\toprule
+Regime & Winner & Winner util. & Nearest util. & Guarded util. & Oracle util. \\
+\midrule
+\input{results/full_scale/full_scale_regime_winners.tex}
+\end{tabular}
+}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\linewidth]{figures/full_scale/regime_winner_phase.pdf}
+\caption{Utility winner by regime. The oracle dominates because it knows the
+fixture and release action. This is a calibration target, not a deployable
+claim.}
+\label{fig:winners}
+\end{figure}
+
+\subsection{Unknown Controls}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Unknown and boundary controls. Nearest known-taxonomy classification
+is damaging under unknown fixtures and partial action menus. Guarding reduces
+damage by abstaining; over-abstention is safe but unproductive.}
+\label{tab:unknown}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llrrrr}
+\toprule
+Condition & Method & Success & Damage & Abst. & Utility \\
+\midrule
+\input{results/full_scale/full_scale_unknown_controls.tex}
+\end{tabular}
+}
+\end{table}
+
+Table~\ref{tab:unknown} is the key boundary table. In the out-of-taxonomy
+regime, nearest fixture classification has only 13.2\% success and 84.6\%
+damage. Guarded abstention lowers damage to 45.2\% but abstains in 42.9\% of
+cases. The over-abstaining guard has low damage but poor success. This is the
+central design tension: avoiding damage is not the same as solving the task.
+
+\subsection{Legacy V2 Stress}
+
+The original v2 cable-tie stress is preserved below as provenance.
 
 \input{docs/unknown_fixture_stress_table.tex}
 
-\section{Related Work Boundary}
-The literature sweep covers contact-rich manipulation, task-and-motion planning,
-tactile inference, support-relation reasoning, robot world models, and assembly
-fixture planning. These areas provide the hostile prior. The narrow boundary for
-this paper is an interpretable latent fixture graph whose nodes are not merely
-unobserved state, but action-selecting causes of constraint.
+The v2 table makes the same point in a sharper toy setting. If the true
+fixture is outside the taxonomy and the correct release action is absent,
+forced known-taxonomy inference is dangerous. A guard can avoid damage mostly
+by refusing to act.
+
+\section{Discussion}
+
+\paragraph{Why geometry-only fails.}
+Geometry-only manipulation fails because visible state is incomplete. If an
+unseen fixture constrains motion, the absence of visible contact does not imply
+free motion. Pulling harder can cause damage.
+
+\paragraph{Why nearest prototypes fail.}
+Nearest-prototype classification is tempting because it converts residuals to
+a known label. It fails when the true fixture is unknown or when the correct
+release action is missing. A wrong label can be worse than uncertainty because
+it licenses a damaging release.
+
+\paragraph{Why abstention matters.}
+Abstention is not success, but it can be the right safe behavior. The guarded
+policy reduces damage by refusing uncertain releases. The over-abstaining
+policy shows the opposite failure: too much abstention makes the robot safe but
+unproductive.
+
+\paragraph{Why active probing matters.}
+Active probe selection improves over static posterior reasoning because it can
+choose residual channels that disambiguate fixture causes. In hardware, this
+means choosing gentle probes that reveal fixture type without damaging the
+assembly.
+
+\paragraph{Why oracle performance matters.}
+The oracle is not a deployable method. Its role is to show that the fixture
+state abstraction is valuable if correctly calibrated. The gap between oracle
+and active probing is the gap future work must close.
 
 \section{Limitations}
-The experiment is a toy model with hand-coded fixture types and synthetic
-residuals. It does not prove that the abstraction scales to real assemblies,
-and the v2 stress shows that the method is brittle when the true fixture class
-or required release action is missing from the taxonomy. The next required step
-is a physical or high-fidelity simulated benchmark where fixtures are hidden
-from perception, revealed through controlled probes, and sometimes outside the
-training taxonomy.
+
+The suite is synthetic. Residual channels are stylized, fixture families are
+hand-designed, utility weights are fixed, and no real robot is used. The
+expected-rollout grid smooths rare physical events. There is no learned
+taxonomy, no tactile sensor model, no high-fidelity contact simulation, and no
+full POMDP implementation beyond a simplified POMDP-style baseline.
+
+The paper is therefore a mechanism paper. It argues that hidden fixture causes
+are useful action-selecting variables and that unknown handling is necessary.
+It does not prove hardware performance.
 
 \section{Conclusion}
+
 Latent fixture reasoning asks robots to treat failed motion as evidence about
-what hidden support is still constraining the world. The contribution is a
-small but useful shift in representation: from visible geometry plus generic
-uncertainty to an interpretable hidden fixture cause that chooses the next safe
-manipulation action.
+what hidden support is still constraining the world. The v3 suite shows that
+visible geometry and forced known-taxonomy classification are unsafe under
+hidden and unknown fixtures, while guarded and active diagnostic policies can
+reduce damage. The strongest next step is hardware: hidden fixtures, measured
+probe residuals, unknown fixtures, abstention, and release-action calibration.
+
+\section{Reproducibility}
+
+The full-scale suite can be regenerated with:
+
+\begin{verbatim}
+python scripts\run_full_scale_fixture_suite.py
+\end{verbatim}
+
+The final PDF is built with:
+
+\begin{verbatim}
+powershell -ExecutionPolicy Bypass -File scripts\build_pdf.ps1
+\end{verbatim}
+
+The runner writes seed metrics, aggregate metrics, table snippets, vector PDF
+figures, a representative trace, and a JSON summary under
+\texttt{results/full\_scale/} and \texttt{figures/full\_scale/}. The final
+build script copies the canonical PDF to
+\texttt{C:/Users/wangz/Downloads/32.pdf} and removes local \texttt{main.pdf}.
 
 \section*{References}
 \small
-The accompanying \texttt{docs/related\_work\_matrix.csv} contains the bounded recovery
-literature sweep used for this mechanism note.
+Contact-rich manipulation; assembly fixture planning; task and motion
+planning; tactile active perception; POMDP and belief-space planning;
+support-relation reasoning; robot world models; and hidden-state inference
+papers identified in \texttt{docs/related\_work\_matrix.csv} and
+\texttt{docs/hostile\_prior\_work.md}.
+
+\appendix
+\renewcommand{\thesection}{\arabic{section}}
+
+\section{Fixture Family Details}
+
+\paragraph{Visible free versus hidden bolt.}
+Visible geometry appears unconstrained, but the part is bolted. Pulling causes
+damage. Residuals show low displacement and low lift compliance.
+
+\paragraph{Latch under occlusion.}
+A latch state is hidden by geometry. Twist or local compliance can reveal it.
+The correct action is unlatch, not pull harder.
+
+\paragraph{Adhesive patch.}
+The part is adhered. Thermal or peel response is informative. The correct
+action may be heat-and-peel or solvent-assisted release.
+
+\paragraph{Hidden stop channel.}
+A stop blocks one direction while allowing reorientation. Residuals indicate
+directional obstruction rather than global attachment.
+
+\paragraph{Cable tie unknown.}
+A flexible restraint is outside the known taxonomy. Forced known-class
+release is damaging; abstention or additional diagnosis is safer.
+
+\paragraph{Magnetic fixture.}
+Holding force resembles adhesive, but the release action differs. This family
+tests action-menu ambiguity.
+
+\paragraph{Dual fixture.}
+Two constraints are active. A single diagnosis and release action is
+insufficient. The robot must diagnose sequentially.
+
+\paragraph{Fixture absent control.}
+No hidden fixture exists. Geometry-only direct action should often work. This
+control prevents the paper from claiming that fixture reasoning is always
+needed.
+
+\section{Regime Details}
+
+The low-noise known-taxonomy regime is the favorable case. High noise makes
+residuals overlap. Limited probe budget restricts reversible diagnosis. High
+damage cost increases the penalty for wrong release. Ambiguous residuals make
+prototype classification unreliable. Out-of-taxonomy introduces unknown
+fixtures. Partial action menu removes the correct release even when the
+fixture can be named. Sensor bias shifts residual calibration. Sequential
+fixture requires multiple diagnosis-release cycles. Free fixture control checks
+that direct manipulation can be correct.
+
+\section{Policy Details}
+
+Geometry-only assumes visible state is complete. Reactive-after-failure commits
+first, then diagnoses from failure. Nearest fixture maps residuals to the
+closest known prototype. Latent posterior uses calibrated known-taxonomy
+belief. Guarded abstention adds unknown detection. Active probe selection
+chooses probes to disambiguate causes. Sequential diagnosis handles multiple
+constraints. POMDP-style belief approximates value-of-information reasoning.
+Generic latent classifier predicts class without strong action semantics.
+Oracle fixture knows the truth. Over-abstaining guard is safe but unproductive.
+Random probe policy is the stochastic baseline.
+
+\section{Metric Derivation}
+
+Success means the policy reaches the correct release or safe free action
+without damaging the assembly. Damage represents collision, excessive force,
+wrong release, or physical harm. Wrong release is the rate of committing an
+incorrect release action. Abstention is refusal to act or request for further
+diagnosis. Probes used counts reversible diagnostic actions. Utility cost
+penalizes failure, damage, wrong release, abstention, and probe cost:
+\[
+J =
+2.8(1-S) + 2.8D + 1.4W + 0.55A + 0.05P,
+\]
+where $S$ is success, $D$ is damage, $W$ is wrong release, $A$ is abstention,
+and $P$ is probes used. Lower is better.
+
+\section{Unknown Detection}
+
+Unknown detection asks whether residuals are too far from all known fixture
+prototypes or have too little posterior margin. A known-taxonomy classifier
+without unknown detection must map every residual to a known cause. This is
+dangerous when the release action is missing. The guarded policy introduces an
+unknown score and abstains when the score is high.
+
+The paper does not claim the guard is optimal. It is a simple mechanism. In
+hardware, unknown detection should be calibrated with held-out fixture classes,
+known distractors, and physical damage costs.
+
+\section{Probe Selection}
+
+Not every probe is equally useful. Pull displacement may distinguish free
+motion from bolt. Twist may distinguish latch. Thermal response may distinguish
+adhesive. Directional compliance may distinguish hidden stop. A random probe
+can waste budget. An active probe should choose the residual channel that most
+reduces uncertainty about the action-relevant fixture cause.
+
+Probe selection must also be safe. A probe that reveals the fixture by damaging
+the assembly is not acceptable. The probe menu should contain reversible,
+bounded-force, or low-energy actions.
+
+\section{Sequential Fixtures}
+
+Real assemblies often have more than one hidden constraint. A panel may be
+bolted and latched. A cover may be clipped and adhered. A cable tie may remain
+after screws are removed. Sequential fixtures break the assumption that one
+classification and one release action is enough.
+
+The sequential diagnosis policy models this by allowing repeated diagnosis and
+release cycles. The result is still synthetic, but the failure mode is real:
+after one fixture is released, the robot must ask whether another constraint
+remains rather than assuming the object is free.
+
+\section{Action Menu Misspecification}
+
+Naming the fixture is not sufficient if the release action is absent. A robot
+that correctly suspects cable tie but cannot cut or release it should not
+force a known release. Partial action menus are common in robots with limited
+tools. The correct behavior may be abstention, tool change, human request, or
+task replanning.
+
+\section{Hardware Protocol}
+
+A hardware study should hide fixtures from initial perception, allow safe
+diagnostic probes, and log residuals. It should include known fixtures,
+unknown fixtures, partial action menus, and free controls. Each trial should
+record object state, fixture ground truth, probe sequence, residuals, belief,
+release action, force/torque, damage, and success.
+
+The core comparison should include geometry-only, reactive-after-failure,
+nearest known taxonomy, guarded abstention, active probing, and an offline
+oracle. The oracle can be computed after ground truth is known. It is a
+calibration target, not a deployed method.
+
+\section{Hardware Dataset Card}
+
+A dataset for latent fixture reasoning should include fixture type, visibility,
+release action, probe menu, residual channels, sensor calibration, force
+limits, damage annotations, and unknown-class indicators. It should include
+trials where the object is free, trials with known fixtures, trials with
+unknown fixtures, and trials where the action menu lacks the correct release.
+
+Without these fields, it is difficult to tell whether a robot solved hidden
+fixture reasoning or merely overfit a small set of residual patterns.
+
+\section{Failure Catalog}
+
+\paragraph{Forced known taxonomy.}
+The robot maps an unknown residual to a known fixture and applies the wrong
+release.
+
+\paragraph{Over-abstention.}
+The robot avoids damage but refuses too many solvable tasks.
+
+\paragraph{Probe damage.}
+The diagnostic action itself damages the assembly.
+
+\paragraph{Sequential miss.}
+The robot releases one fixture and assumes the object is free while another
+constraint remains.
+
+\paragraph{Action-menu miss.}
+The robot names the fixture but lacks the tool or release action needed.
+
+\paragraph{Sensor bias.}
+Residual calibration shifts and known prototypes become unreliable.
+
+\section{Reviewer Attack Map}
+
+\paragraph{Attack: This is just a POMDP.}
+Response: a POMDP is a valid formalization. The paper's contribution is the
+fixture-cause abstraction and the explicit unknown/action-menu boundary.
+
+\paragraph{Attack: The suite is synthetic.}
+Response: correct. The paper does not claim hardware validation.
+
+\paragraph{Attack: Oracle dominates.}
+Response: the oracle is an upper reference showing the value of calibration.
+
+\paragraph{Attack: Abstention is not success.}
+Response: correct. The paper reports abstention separately and includes
+over-abstaining failure.
+
+\paragraph{Attack: Free objects do not need fixture reasoning.}
+Response: correct. The free-fixture control is included for that reason.
+
+\section{Claim Boundary}
+
+The strongest supported statement is:
+
+\begin{quote}
+In hidden-fixture manipulation, residuals from safe probes can support an
+action-selecting posterior over fixture causes. Known-taxonomy inference helps
+when the taxonomy and release menu cover the true cause; unknown detection and
+abstention are required when they do not.
+\end{quote}
+
+The paper does not support universal fixture discovery, hardware performance,
+or replacing POMDPs. It supports a representation and evaluation boundary.
+
+\section{Comparison To The V2 Stress}
+
+The v2 cable-tie stress showed that forced known-taxonomy inference can fail
+catastrophically when the true fixture is outside the menu. The v3 suite keeps
+that lesson and broadens it. Cable ties, magnetic fixtures, partial action
+menus, and dual fixtures all expose the same risk: confidence in a wrong
+taxonomy can be worse than uncertainty.
+
+\section{Calibration Details}
+
+Fixture prototypes should be calibrated from safe probes. For each fixture
+class, collect residual distributions under bounded force, twist, lift,
+thermal, and reorientation probes. Estimate class likelihoods and unknown
+thresholds on held-out classes. Calibrate release actions separately; a
+fixture name is useful only if the robot has the correct action.
+
+\section{Decision Checklist For Deployment}
+
+Before deploying latent fixture reasoning, ask: What fixtures are in the
+taxonomy? What fixtures are intentionally outside it? What release actions are
+available? What probe actions are safe? What damage threshold triggers
+abstention? What human or tool-change fallback exists? How is unknown
+detection calibrated? What happens after one fixture is released?
+
+\section{One-Page Field Protocol}
+
+A field protocol should begin with a hidden fixture set. Hide fixtures from
+initial perception, allow a fixed safe probe menu, and require the robot to
+choose release, further diagnosis, or abstention. Include known fixtures,
+unknown fixtures, free controls, and partial action menus. Report success,
+damage, wrong release, probes, abstention, and utility. Then inspect failures
+by hand and label them as taxonomy miss, action-menu miss, probe ambiguity,
+sensor bias, sequential miss, or over-abstention.
+
+\section{Implementation Notes}
+
+A minimal implementation can sit between perception and manipulation planning.
+It reads residuals from small probes, updates a fixture posterior, computes an
+unknown score, and selects a release action or abstention. The planner does not
+need to be replaced. The key addition is the action-selecting latent fixture
+state and the rule that unknown residuals should not be forced into known
+release actions.
+
+\section{Open Problems}
+
+Open problems include learning fixture taxonomies, discovering new fixture
+classes, calibrating unknown thresholds, selecting safe probes, integrating
+with POMDP planners, handling deformable fixtures, diagnosing multiple
+constraints, and transferring fixture models across object categories and
+workcells.
+
+\section{Regime-By-Regime Extended Reading}
+
+\paragraph{Low-noise known taxonomy.}
+This is the favorable case for latent fixture reasoning. Residuals are clean,
+the fixture class is covered, and the release menu contains the right action.
+If a method fails here, it is not ready for harder settings. The suite expects
+posterior and active-probe methods to improve over geometry-only manipulation
+because residuals reliably identify the hidden cause.
+
+\paragraph{High-noise known taxonomy.}
+Noise makes residual prototypes overlap. A bolt can look like a hidden stop,
+and adhesive can look like a magnetic fixture. The right response is not to
+force a confident release, but to probe again or reduce action force. This
+regime tests whether the policy treats confidence as action relevant.
+
+\paragraph{Limited probe budget.}
+Robots cannot probe forever. Probe budget can be limited by time, damage risk,
+battery, thermal constraints, or human patience. A policy should spend probes
+where they change the release decision. Random probing is weak here because it
+does not target the residual dimension that matters.
+
+\paragraph{High damage cost.}
+Wrong release actions can bend a bracket, tear adhesive, shear a bolt, break a
+cable, or damage the robot. High damage cost should push the policy toward
+guarded abstention or safer probing. A policy that looks good under low damage
+cost can be unacceptable in repair, medical, or field deployment.
+
+\paragraph{Ambiguous residuals.}
+Some fixtures produce similar residuals. A latch and a magnetic fixture can
+both resist pull but allow slight twist. Adhesive and cable ties can both show
+compliant displacement. The ambiguity regime checks whether a method knows
+when prototypes are too close for confident release.
+
+\paragraph{Out of taxonomy.}
+This is the central boundary regime. A known-taxonomy classifier must map every
+observation to a known class. That is dangerous when the true fixture is not in
+the taxonomy. The correct behavior is not better nearest-neighbor matching; it
+is unknown detection, abstention, tool change, or additional diagnosis.
+
+\paragraph{Partial action menu.}
+Even if the robot can name the fixture, it may not have the correct release
+action. A robot without cutters should not treat a cable tie as a latch. A
+robot without heat should not treat adhesive as safely releasable. The action
+menu is part of the state abstraction.
+
+\paragraph{Sensor bias.}
+Residual calibration can drift. Force sensors can be biased, tactile arrays can
+shift, thermal response can depend on ambient temperature, and camera estimates
+can be misregistered. Sensor bias tests whether the model is robust to
+systematic residual shifts.
+
+\paragraph{Sequential fixture.}
+Assemblies often contain multiple constraints. Releasing one fixture can reveal
+another. The sequential regime tests whether the robot can continue diagnosis
+instead of assuming the object is free after the first successful release.
+
+\paragraph{Free fixture control.}
+The object can be genuinely free. Geometry-only direct manipulation should win
+or be competitive in this condition. This control prevents the paper from
+becoming an argument that every manipulation action needs elaborate hidden
+fixture inference.
+
+\section{Method-By-Method Extended Reading}
+
+\paragraph{Geometry only.}
+Geometry-only manipulation is the simplest baseline and the most important
+failure case. It assumes that if no fixture is visible, no fixture matters.
+This is false in many assemblies. The policy can be appropriate in the
+fixture-absent control, but it is unsafe when hidden fixtures are common.
+
+\paragraph{Reactive after failure.}
+The reactive policy obtains information only after an initial failed action.
+This resembles many real systems: try, fail, then adapt. The problem is that
+the first failure can already cause damage. Reactive behavior is better than
+never reasoning, but it should not be the first line of defense when fixtures
+are likely.
+
+\paragraph{Nearest fixture.}
+Nearest-prototype classification is attractive because it is simple. It turns
+residuals into a label. Its weakness is exactly that simplicity: every
+residual must be assigned to something. Unknown fixtures, shifted sensors, and
+missing release actions make forced nearest-class decisions dangerous.
+
+\paragraph{Latent fixture posterior.}
+The posterior policy improves on nearest prototypes by representing belief
+rather than only the closest class. It can express uncertainty among known
+fixtures. It remains weak when unknown detection is poor, because uncertainty
+over known classes is not the same as recognizing an absent class.
+
+\paragraph{Guarded abstention.}
+The guarded policy adds an unknown score and refuses some releases. It reduces
+damage, but abstention is not success. Its value depends on the cost of damage
+relative to the cost of pausing, asking for help, or changing tools.
+
+\paragraph{Active probe selection.}
+Active probing chooses residual channels to disambiguate action-relevant
+fixtures. It is stronger than passive posterior updates because the robot
+controls what evidence it collects. In hardware, active probes must be safe,
+bounded, and reversible.
+
+\paragraph{Sequential diagnosis.}
+Sequential diagnosis is necessary when more than one fixture can be active.
+The method asks after each release whether another hidden constraint remains.
+This is important in disassembly and maintenance, where multiple fasteners,
+clips, adhesives, or ties may coexist.
+
+\paragraph{POMDP-style belief.}
+The POMDP-style baseline is included to acknowledge that belief-space planning
+is a natural formalization. It scores probes and release actions by expected
+utility. The paper does not claim to beat full POMDP planning; it claims that
+the fixture variable and unknown boundary should be represented.
+
+\paragraph{Generic latent classifier.}
+A generic classifier predicts latent class without strong action semantics. It
+can improve classification but may not choose the right release. This baseline
+distinguishes prediction from action-selecting reasoning.
+
+\paragraph{Oracle fixture.}
+The oracle knows the true fixture and release action. Its strong performance
+is not a deployable claim. It is a target showing how much value is available
+if fixture taxonomy, unknown detection, and release actions are calibrated.
+
+\paragraph{Over-abstaining guard.}
+Over-abstention is safe but unproductive. It has low damage because it refuses
+too much. Including it prevents the paper from claiming that abstention alone
+solves hidden fixtures.
+
+\paragraph{Random probe policy.}
+Random probes test whether simply collecting more residuals is enough. It is
+usually not. Probe choice should be tied to the fixture hypotheses and release
+actions being disambiguated.
+
+\section{Probe Residual Catalog}
+
+The suite abstracts residuals, but hardware would produce concrete signals.
+Pull displacement indicates whether the part moves under bounded force. Lift
+compliance can distinguish free motion from bolted or stopped motion. Twist
+compliance can reveal latches or clips. Thermal response can reveal adhesive.
+Directional resistance can reveal stops or rails. Vibration response can reveal
+loose fasteners. Force slope can distinguish rigid bolts from flexible ties.
+Slip after release can reveal magnets or suction.
+
+No single residual is sufficient. A cable tie can look compliant under pull
+but resist release differently from adhesive. A magnet can resemble adhesive in
+holding force but not in thermal response. A hidden stop can look like a bolt
+under one direction and like free motion after reorientation. The useful
+diagnostic object is therefore a vector of residuals gathered by safe probes.
+
+Residuals should be calibrated at bounded force and speed. A probe that
+reveals a fixture only by breaking it is not a diagnostic probe; it is a
+damaging release attempt. The probe menu should include low-force pull, small
+twist, small lift, thermal check, directional compliance, and visual
+reinspection after each safe motion.
+
+\section{Unknown Threshold Calibration}
+
+Unknown detection requires a threshold. If the threshold is too low, the robot
+forces unknown fixtures into known classes and damages the assembly. If the
+threshold is too high, the robot abstains too often and cannot complete useful
+tasks. Calibration should therefore optimize a cost-sensitive objective, not
+only classification accuracy.
+
+A practical calibration protocol is to hold out fixture classes during
+training. Train prototypes or likelihoods on known fixtures. Evaluate distance,
+posterior margin, and residual reconstruction error on held-out fixtures. Pick
+a threshold that bounds damage under unknowns while preserving success on
+known fixtures. Then test the threshold on a separate set of assemblies.
+
+The v3 suite treats threshold behavior synthetically through unknown skill and
+abstention bias. The result is a reminder, not a final calibration method.
+Hardware must estimate these thresholds from physical residual distributions.
+
+\section{Action Menu Design}
+
+A fixture taxonomy is useful only if the robot can act on it. Naming adhesive
+does not help if the robot cannot heat, peel, or soften adhesive. Naming cable
+tie does not help if the robot cannot cut or release it. Naming bolt does not
+help if the robot has no tool. The action menu should be designed with the
+taxonomy.
+
+The action menu should include safe fallback actions. Abstention is one
+fallback, but not the only one. The robot may ask for a tool change, request a
+human, choose a lower-risk reorientation, perform visual reinspection, or move
+the assembly to a fixture-removal station. These actions are outside the
+current synthetic suite but fit the same framework.
+
+Partial action menus are dangerous because they can create false confidence.
+The robot may correctly infer the cause and still choose a damaging action
+because the correct release is unavailable. A deployable system should make
+action availability explicit in the decision rule.
+
+\section{Statistical Reporting Plan}
+
+A hardware paper should report paired trials whenever possible. The same
+assembly configuration should be attempted by geometry-only, nearest fixture,
+guarded abstention, active probing, and oracle analysis. Pairing makes it
+easier to distinguish policy performance from fixture difficulty.
+
+Primary endpoints should be declared before evaluation. One possible endpoint
+is utility with pre-registered weights for success, damage, wrong release,
+abstention, and probe cost. Another is success subject to a maximum damage
+rate. Secondary endpoints should include probe count, belief confidence,
+unknown score, release attempts, and time.
+
+Damage should be reported as a distribution, not only a mean. Rare severe
+damage matters in assembly. A policy with slightly higher average success but
+occasional catastrophic wrong release may be worse than a conservative policy.
+
+\section{Comparison To POMDPs}
+
+A POMDP can represent hidden fixtures formally. The state contains fixture
+class, action availability, damage state, and object pose. Actions include
+probes, releases, reorientation, and abstention. Observations are residuals.
+Rewards penalize damage and unnecessary probing. In that sense, a full POMDP
+is a natural solution.
+
+The paper's point is that the state abstraction matters. If the POMDP state
+does not contain action-selecting fixture causes, the planner may model
+residuals generically without choosing safe release actions. If the POMDP lacks
+an unknown state or action-menu model, it can still force bad known-class
+releases. Latent fixture reasoning can be seen as a structured state design
+for such a POMDP.
+
+\section{Safety Case}
+
+The safety case has three parts. First, probes must be bounded and reversible.
+Second, release actions must be gated by confidence, unknown score, and action
+availability. Third, unknown or ambiguous residuals must have a safe fallback.
+The robot should not be forced to act merely because the benchmark expects an
+action.
+
+The main safety risk is misplaced confidence. A posterior over the wrong
+taxonomy can look precise. That precision is dangerous because it legitimizes
+a damaging release. Unknown detection is therefore a safety mechanism, not
+just a classification feature.
+
+\section{Hardware Evaluation Protocol}
+
+A hardware benchmark should hide fixtures from the initial camera view and
+reveal them only through residuals or ground-truth labels after the trial.
+Assemblies should include known fixtures, unknown fixtures, multiple fixtures,
+and free parts. The robot should have a safe probe menu and a release menu with
+some missing actions. This creates the partial-action boundary.
+
+Each trial should log probe actions, force/torque, displacement, compliance,
+thermal response, visual reinspection, belief updates, unknown score, chosen
+release, damage, and final success. The offline oracle should be computed from
+ground truth to estimate the value of perfect fixture knowledge.
+
+\section{Dataset Schema}
+
+A dataset row should include assembly id, part id, hidden fixture ground truth,
+known/unknown flag, available release actions, probe sequence, residual vector,
+belief over known fixtures, unknown score, release action, damage annotation,
+success, abstention, and recovery action. If multiple fixtures are present,
+the row should include the sequence of fixture states before and after each
+release.
+
+The dataset should also include calibration splits. Known fixtures used to fit
+prototypes should be separated from held-out unknown fixtures used to set the
+abstention threshold. Without such splits, unknown detection can overfit.
+
+\section{Hardware Case Study: Appliance Cover}
+
+An appliance cover may be held by screws, snap latches, adhesive strips, and
+hidden stops. A camera sees the cover outline but not all retaining features.
+A pull residual can distinguish free motion from hidden fastening. A twist
+residual can reveal latches. Thermal response can reveal adhesive. Directional
+compliance can reveal stops.
+
+A geometry-only robot may pull and crack the cover. A nearest-prototype robot
+may classify adhesive as latch and pry incorrectly. A guarded policy may
+abstain when residuals resemble an unknown cable tie or missing tool case. An
+active policy should choose the next low-force probe that disambiguates latch
+from adhesive before release.
+
+\section{Hardware Case Study: Cable Harness}
+
+Cable harness manipulation often contains hidden clips, ties, frictional
+wraps, and routing constraints. The visible cable shape may not reveal what is
+holding it. Pulling can damage connectors or insulation. Fixture reasoning is
+especially relevant because the correct action may be cut, unclip, reroute, or
+abstain.
+
+Unknown detection is crucial here. A cable tie is easy to misclassify as
+adhesive or latch if the taxonomy lacks flexible restraints. The robot should
+recognize residuals that do not fit known prototypes and request a tool or
+human intervention rather than forcing a release.
+
+\section{Hardware Case Study: Pallet And Packaging}
+
+Packaging can contain tape, adhesive, staples, clips, straps, and hidden
+inserts. Many are visually occluded. Probe residuals can reveal whether a box
+flap is taped, clipped, or free. Wrong release can tear packaging or damage
+the object inside. A latent fixture model provides an interpretable bridge
+between residuals and the next safe manipulation action.
+
+\section{Extended Failure Analysis}
+
+The highest damage cases in the suite occur when unknown fixtures are forced
+into known classes or when the action menu is incomplete. This is not a
+surprise. It is the exact failure the paper wants to expose. A classifier that
+must always answer with a known class is structurally unsafe under unknown
+fixtures.
+
+The lowest damage but low success cases occur under over-abstention. This is
+also not a solution. A robot that never acts is safe but useless. The practical
+goal is calibrated abstention: refuse when wrong release is likely and act
+when the fixture and release action are sufficiently identified.
+
+\section{What To Report In A Real Paper}
+
+A real paper should report success, damage, wrong release, abstention, probes,
+diagnostic time, belief confidence, unknown score, and oracle gap. It should
+include a confusion matrix over known fixtures and a separate unknown-detection
+curve. It should report how often the correct fixture was named but the correct
+release action was unavailable.
+
+The oracle gap is important. If the oracle is strong and the deployed policy is
+weak, the problem is calibration or inference. If the oracle is weak, the
+fixture abstraction or action menu may be insufficient.
+
+\section{Reviewer Checklist}
+
+A reviewer should ask whether unknown fixtures are included, whether
+abstention is reported separately from success, whether free controls are
+included, whether the action menu can represent the true release, whether
+multiple fixtures are tested, whether probes are safe, and whether damage is
+measured. A paper that reports only known-fixture classification accuracy has
+not evaluated latent fixture reasoning.
+
+\section{Minimal Arithmetic Example}
+
+Suppose a hidden fixture can be bolt, latch, or unknown tie. A nearest
+prototype classifier assigns residuals to the closest known class. If unknown
+ties occur 20\% of the time and every forced tie release causes damage, then
+even perfect known-class accuracy leaves a 20\% damage floor. A guard that
+detects 80\% of unknown ties can reduce that damage floor to 4\%, but it will
+abstain. Whether that tradeoff is good depends on the cost of damage versus
+the cost of abstention.
+
+\section{Long-Form Summary}
+
+The paper began with a simple manipulation observation: when an object does
+not move, something unseen may be holding it. The cause matters because each
+fixture implies a different safe release. Visible geometry alone cannot name
+that cause. Generic uncertainty is too broad. A latent fixture variable gives
+the robot an interpretable action-selecting state.
+
+The v3 suite expands the original toy mechanism. It shows that geometry-only
+and nearest known-taxonomy reasoning are unsafe under hidden and unknown
+fixtures. It shows that guarded abstention reduces damage but can become
+unproductive. It shows that active probing improves deployable success and
+that oracle knowledge would be much stronger. The result is a bounded but
+useful claim: fixture reasoning helps, but only with calibrated taxonomy,
+unknown detection, action-menu coverage, and safe probes.
+
+\section{Closing Boundary Statement}
+
+The final v3 paper is not a hardware claim. It is a synthetic mechanism paper
+with broad stress tests and explicit negative controls. Its strongest value is
+not a performance number; it is a representation boundary. Hidden fixture
+causes should be represented when they choose different release actions, and
+unknown causes should not be forced into known labels.
+
+\section{Detailed Synthetic Equations}
+
+The expected rollout uses a small set of interpretable ingredients. Hidden
+fixture pressure increases with the family hidden-rate and the regime
+difficulty. Unknown pressure increases with the family unknown-rate and the
+out-of-taxonomy multiplier. Residual ambiguity increases with family ambiguity,
+noise, and sensor bias. Action coverage decreases when the fixture is unknown
+or the action menu is incomplete.
+
+For a policy $m$, the diagnostic quality is modeled as a bounded function of
+probe skill, probe signal, probe count, ambiguity, and sensor bias:
+\[
+q_m =
+\mathrm{clip}
+\left(
+\frac{s_m \phi_f \sqrt{1+P_m}}
+{0.65 + \alpha_f n_r + b_r},
+0,1
+\right),
+\]
+where $s_m$ is method probe skill, $\phi_f$ is family probe signal, $P_m$ is
+probes used, $\alpha_f$ is fixture ambiguity, $n_r$ is regime noise, and $b_r$
+is sensor bias. The formula is not meant to be a physical law. It makes the
+synthetic comparison transparent.
+
+Known-fixture accuracy is then:
+\[
+a_{\mathrm{known}} =
+\mathrm{clip}
+\left(
+\tau_m q_m c_r,
+0,1
+\right),
+\]
+where $\tau_m$ is taxonomy skill and $c_r$ is action-menu coverage. This makes
+taxonomy and action menu inseparable. A policy can classify correctly but still
+fail if the correct release action is absent.
+
+Unknown detection is:
+\[
+u_m =
+\mathrm{clip}
+\left(
+\eta_m(0.35 + 0.65q_m),
+0,1
+\right),
+\]
+where $\eta_m$ is unknown-detection skill. Nearest-class and plain posterior
+methods have weak unknown detection. Guarded and POMDP-style methods have
+stronger unknown detection. The oracle has perfect unknown knowledge.
+
+Wrong release combines known-class error, forced unknown-class error, action
+menu error, and sequential error. The final damage rate is wrong release
+weighted by fixture damage cost plus a residual term for low diagnostic
+quality. This is why guarded policies can reduce damage even when they do not
+solve the task: they refuse some high-risk releases.
+
+\section{Interpreting Utility}
+
+Utility cost is not a universal objective. It is a transparent synthetic score
+that lets the paper compare methods on the same axes:
+\[
+J = 2.8(1-S) + 2.8D + 1.4W + 0.55A + 0.05P.
+\]
+Here $S$ is success, $D$ is damage, $W$ is wrong release, $A$ is abstention,
+and $P$ is probe count. Damage and failure are weighted strongly because the
+paper studies manipulation safety. Abstention is penalized less than damage
+because refusing to act is often safer than a damaging release, but it is still
+not free.
+
+Changing these weights changes the preferred policy. In a factory where
+abstention is cheap and damage is expensive, guarded policies become more
+attractive. In a time-critical setting where abstention is expensive, active
+probing or POMDP-style policies may be preferred. This is why the manuscript
+reports separate metrics rather than only utility.
+
+\section{Ablation Matrix}
+
+The full-scale suite contains several ablations. The noise ablation compares
+low-noise and high-noise known-taxonomy regimes. The budget ablation is the
+limited-probe regime. The damage ablation is the high-damage-cost regime. The
+unknown ablation is the out-of-taxonomy regime and cable-tie family. The
+action-menu ablation is the partial-action-menu regime. The sequential
+ablation is the dual-fixture family and sequential-fixture regime. The free
+control is the fixture-absent family and free-fixture regime.
+
+These ablations jointly protect the claim from simple interpretations. If the
+only lesson were ``classify fixtures,'' the unknown and partial-menu regimes
+would contradict it. If the only lesson were ``abstain more,'' the
+over-abstaining guard would contradict it. If the only lesson were ``geometry
+is bad,'' the free-fixture control would contradict it.
+
+\section{Annotation Protocol}
+
+Human annotation for a hardware dataset should separate fixture ground truth,
+residual observations, and action outcomes. Fixture ground truth should be
+annotated after disassembly or with privileged inspection, not inferred from
+the robot's belief. Residual observations should record the measured signals
+under each probe. Action outcomes should record whether the release was
+correct, whether damage occurred, and whether another hidden fixture remained.
+
+Damage labels should be graded. Minor scuffing, elastic deformation, broken
+clip, torn cable, stripped fastener, and tool collision are different events.
+The utility function may weight them differently. A binary damage label is a
+start but not enough for real deployment.
+
+Unknown labels should also be explicit. A fixture is unknown if it is outside
+the training taxonomy or if the required release action is absent. These are
+different failure modes. The first is a perception/taxonomy failure; the second
+is a planning/tooling failure.
+
+\section{Probe Design Rules}
+
+A probe should satisfy four criteria. It should be bounded, so it cannot exceed
+safe force or motion. It should be reversible, so it does not permanently
+change the assembly. It should be diagnostic, so the residual meaningfully
+changes the fixture posterior. It should be action relevant, so the
+information changes a release decision or abstention decision.
+
+Not all common robot actions are good probes. A hard pull is diagnostic but
+unsafe. A camera view may be safe but not diagnostic if the fixture is hidden.
+A thermal probe may be diagnostic for adhesive but irrelevant for bolts. Good
+probe design is therefore fixture-family specific.
+
+\section{Release Action Semantics}
+
+Release actions should be represented semantically, not only as motor
+commands. Unbolt, unlatch, heat-and-peel, reorient, cut, demagnetize, slide,
+and abstain are different because they assume different fixture causes. A
+motor trajectory that succeeds for one fixture may damage another. The action
+menu should therefore be tied to fixture hypotheses.
+
+This semantic action menu is also useful for human supervision. If the robot
+abstains and reports ``unknown flexible restraint, cutter not available,'' a
+human can intervene effectively. If it reports only low confidence, the
+failure is harder to diagnose.
+
+\section{Unknown Discovery Versus Unknown Detection}
+
+Unknown detection asks whether the current residual is outside the known
+taxonomy. Unknown discovery asks how to create a new class. This paper studies
+detection, not discovery. Discovery would require clustering unknown residuals,
+validating new release actions, naming the new fixture type, and updating the
+taxonomy safely.
+
+The distinction matters because a robot should not invent a new release action
+online in a safety-critical setting. It can detect that the known taxonomy is
+insufficient and request assistance. Later, offline analysis can add a new
+fixture class.
+
+\section{Deployment Workflow}
+
+A deployment workflow can start with a known fixture taxonomy from engineering
+knowledge: screws, latches, clips, adhesive, stops, straps, magnets, and free
+motion. Engineers then define safe probes for each likely ambiguity. The robot
+collects calibration residuals under controlled conditions. The team fits
+known prototypes and unknown thresholds. Only then should the robot use the
+fixture posterior during task execution.
+
+During execution, the robot should maintain a log of probe residuals and belief
+updates. When the posterior is confident and the release action is available,
+it acts. When the posterior is uncertain, it probes if safe. When the unknown
+score is high or the action is unavailable, it abstains or asks for a fallback.
+
+\section{Failure Case: Confident Wrong Bolt}
+
+A common failure is a confident wrong bolt classification. A latch hidden
+behind occlusion produces low displacement and low lift compliance, so the
+nearest known prototype is bolt. The robot applies an unbolt action or pulls
+with bolt-release assumptions. Damage occurs because the latch needed a
+different motion. The fix is not merely more force data; it is a probe that
+distinguishes latch twist from bolt rigidity.
+
+\section{Failure Case: Adhesive Versus Magnet}
+
+Adhesive and magnetic fixtures can both resist pull. Thermal response and
+sliding response distinguish them. If the taxonomy lacks magnets, magnetic
+residuals may be mapped to adhesive. The robot may heat or peel when it should
+slide or demagnetize. This is an action-menu error as much as a classification
+error.
+
+\section{Failure Case: Released But Still Constrained}
+
+After one fixture is released, the object may still not move. A single-stage
+policy can interpret this as release failure and apply more force. Sequential
+diagnosis instead asks whether another fixture remains. This is crucial for
+dual-fixture assemblies. The robot should update the fixture graph after each
+release action.
+
+\section{Failure Case: Safe But Useless Abstention}
+
+Over-abstention is a real operational failure. A robot that refuses every
+ambiguous assembly may avoid damage but provide little value. Abstention should
+trigger a recovery workflow: additional safe probe, tool change, human request,
+or task deferral. Reporting abstention separately keeps this failure visible.
+
+\section{Fixture Graph Representation}
+
+A fixture graph can represent parts as nodes and fixture causes as edges or
+hyperedges. A bolt edge connects a part to the base. A latch edge connects a
+cover to a housing. An adhesive patch may be a distributed edge. A hidden stop
+can be directional. A dual fixture creates multiple active edges. The graph
+changes after release actions.
+
+This representation is more interpretable than a single latent vector. It
+allows the planner to ask which edge constrains which motion and which release
+action removes that edge. It also supports sequential diagnosis: after one edge
+is removed, other edges may remain.
+
+\section{Integration With Task Planning}
+
+Latent fixture reasoning can be integrated with task planning by adding
+diagnose, release, reorient, and abstain actions. Preconditions depend on
+fixture belief and action availability. Effects update the fixture graph. Costs
+include probe time, damage risk, tool use, and abstention. The symbolic planner
+does not need to know raw residuals; it needs the belief and unknown score.
+
+This separation is useful. Low-level perception and control produce residuals.
+The fixture module turns residuals into belief. The planner chooses actions
+based on belief and action availability. The interface is interpretable.
+
+\section{Comparison To Generic World Models}
+
+A generic world model could learn that certain residual patterns predict
+release failure. That is useful, but it may not explain what action to take
+next. A latent fixture model names the cause and maps it to action. The
+difference matters when a human or planner must intervene. ``Predicted failure
+0.8'' is less actionable than ``likely cable tie, cutter unavailable.''
+
+\section{Additional Hardware Metrics}
+
+Hardware evaluation should report force peaks, impulse, deformation, residual
+after each probe, residual after release, tool changes, human interventions,
+and recovery time. It should also report whether damage was caused by a probe
+or by a release. Probe damage indicates unsafe diagnosis; release damage
+indicates wrong action selection.
+
+\section{Pre-Registered Tests}
+
+Before hardware evaluation, declare tests. In known low-noise fixtures, latent
+posterior and active probing should outperform geometry-only. In unknown
+fixtures, nearest known taxonomy should have high damage and guarded
+abstention should reduce damage. In free controls, geometry-only should be
+competitive. In sequential fixtures, single-stage diagnosis should fail more
+often than sequential diagnosis. In partial action menus, the robot should
+abstain when the correct release is unavailable.
+
+\section{What Not To Claim}
+
+Do not claim that the taxonomy is complete. Do not claim that abstention is
+success. Do not claim hardware validation from synthetic residuals. Do not
+claim that POMDPs are unnecessary. Do not claim that every manipulation task
+needs fixture reasoning. The claim is narrower and stronger: when hidden
+fixtures choose different release actions, they should be represented and
+unknowns should be guarded.
+
+\section{Extended Artifact Notes}
+
+The full-scale runner writes 76,800 seed rows and 960 aggregate rows. It stores
+only compact summaries and one representative trace. The figures are small
+vector PDFs generated without external plotting packages. The purpose of the
+artifact is inspectability. A reviewer can read the CSVs and table snippets
+without running a large simulator.
+
+\section{Practical Debugging Questions}
+
+When the robot fails, ask: Was the fixture in the taxonomy? Was the correct
+release action available? Were residuals ambiguous? Was the unknown score high?
+Did the policy abstain? Did a probe cause damage? Did release one expose
+another fixture? Did sensor bias shift the residual? These questions map
+directly to the failure catalog and guide the next system improvement.
+
+\section{Detailed Known-Fixture Worked Examples}
+
+This section expands the mechanism with concrete known-fixture examples. The
+examples are synthetic, but each follows the same interface used by the
+full-scale suite: a small set of bounded probes produces residuals, a fixture
+posterior and unknown score are updated, and a release or abstention action is
+selected. The purpose is to make clear what the latent variable is doing that a
+visible-geometry policy does not do.
+
+\paragraph{Hidden bolt behind an apparently free panel.}
+The observed mesh shows a panel with no visible fastener. A geometry-only
+policy predicts that a direct pull should separate the panel. The first bounded
+pull probe returns low displacement, high normal reaction, and little angular
+compliance. The residual is consistent with a rigid point constraint. A second
+small twist probe produces almost symmetric resistance in both directions. In
+the known taxonomy, the posterior shifts toward a bolt or rigid clip and away
+from adhesive, latch, and magnet. If the action menu contains an unbolt or
+fastener search action, a latent fixture policy can choose it. If the menu does
+not contain that action, the correct behavior is not to pull harder; it is to
+abstain or request a tool change.
+
+The difference from a generic failure detector is the action semantics. A
+failure detector can say that the direct pull failed. The latent fixture model
+says that the failure looks like a removable rigid fixture and that the next
+safe action should be a fastener-oriented release. This is why the paper
+separates wrong release from failure. A pull that fails without damage is
+recoverable. A pull that tears the panel because the robot ignored a bolt is a
+different outcome.
+
+\paragraph{Occluded latch with directional release.}
+Consider a cover whose latch is hidden on the back side. A direct pull probe
+gives low displacement, but a lateral slide probe gives a small asymmetric
+motion and a change in torque. A bolt model explains the low displacement but
+not the lateral asymmetry. A latch model explains both. The posterior therefore
+selects an unlatch or slide-release action. If the robot instead chooses an
+unbolt action because bolt and latch both look rigid in the first probe, it
+will waste time and may damage the latch tab.
+
+This example motivates active probing. The first probe is not enough. A policy
+that can choose a second probe based on posterior ambiguity can ask a question
+that separates bolt from latch. In the aggregate results, this is the role of
+the active-probe and POMDP-style methods: they do not simply collect more data;
+they collect data whose expected value changes the release decision.
+
+\paragraph{Adhesive patch versus magnetic fixture.}
+Adhesive and magnetic fixtures can both resist a normal pull. The important
+distinction is release semantics. Adhesive may require heat, peel angle, or
+slow separation. A magnetic fixture may require sliding, demagnetizing, or a
+normal force above a threshold. A thermal probe and a lateral slide probe have
+different diagnostic value for the two cases. If the taxonomy contains
+adhesive but not magnet, the posterior may confidently select adhesive. That
+confidence is misleading because the action selected by the label is wrong.
+
+The magnetic family in the full-scale suite exists to expose this boundary.
+Nearest known-taxonomy classification is not enough when the right class or
+right release is missing. Guarded methods reduce damage by raising the unknown
+score when residuals are close to no known prototype or when the known label
+requires an unavailable action. The oracle gap then measures how much value is
+left if the taxonomy and release model are made correct.
+
+\paragraph{Hidden stop in a channel.}
+A stop fixture blocks motion in one direction while allowing another. A direct
+pull may fail, but a reorientation or slide may succeed. This is a fixture
+reasoning case even though no external fastener is removed. The latent cause is
+directional constraint, and the release action is to change the motion plan.
+Geometry-only planning can miss the stop if the stop is occluded or internal.
+A posterior over hidden stop versus bolt matters because a bolt suggests tool
+use, while a stop suggests reorientation.
+
+This case also explains why the fixture variable is not merely a material
+label. The same plastic part can be constrained by a stop, latch, adhesive, or
+bolt. What matters for planning is the hidden relation between the object and
+the environment. The fixture state names that relation and its release action.
+
+\section{Detailed Unknown-Fixture Worked Examples}
+
+Unknown fixtures are not an edge case; they are central to the claim boundary.
+The most dangerous failure mode is a confident known-class assignment for a
+fixture whose release is not represented. The full-scale suite therefore
+includes out-of-taxonomy and partial-action-menu regimes, plus the cable-tie
+and magnetic families. The examples below show why the correct response can be
+abstention even when the robot has enough evidence that the direct action will
+fail.
+
+\paragraph{Cable tie mistaken for latch.}
+A cable tie around a bundle can produce low displacement and directional
+asymmetry. In a taxonomy without flexible restraints, the nearest known class
+may be latch because both restrict motion until a small release-like motion is
+performed. The action semantics are different: a latch should be unlatched; a
+tie may require cutting, loosening, or human intervention. If the robot forces
+the latch interpretation and applies a latch release, it can tear the tie,
+stress a cable, or collide with surrounding components.
+
+The guarded-abstention policy is designed for this setting. It can report that
+the residual is far from known prototypes, or that the best known label has low
+margin over alternatives. It then refuses the release. The refusal is not
+counted as success in the paper. It is counted as abstention, and utility still
+penalizes it. This accounting prevents the paper from hiding the cost of
+safety. The important empirical pattern is that guarded abstention cuts damage
+relative to nearest-known classification while preserving some useful success.
+
+\paragraph{Correct label but missing action.}
+Unknownness is not only a perception property. A fixture can be recognized yet
+still be operationally unknown because the robot lacks the required release
+tool. A robot may infer adhesive with high confidence, but if no heat or peel
+tool is available, the release action is absent. Treating this as a successful
+classification would overstate capability. Treating it as an action-menu
+misspecification correctly exposes the planning failure.
+
+This is why the full-scale suite separates taxonomy coverage from action-menu
+coverage. The posterior over labels is only useful if the planner can execute
+the corresponding release. A practical system should therefore attach an
+availability flag to each semantic release. The robot should abstain when the
+fixture is recognized but unreleasable with the current tool set.
+
+\paragraph{Unknown caused by sensor shift.}
+A biased force sensor can make known fixtures look unknown. In deployment,
+unknown detection must distinguish true out-of-taxonomy residuals from
+calibration drift. The sensor-bias regime tests this by shifting residuals
+without changing the underlying fixture. A guard that is too sensitive may
+abstain excessively. A guard that is too permissive may force incorrect
+releases. The calibration task is therefore two-sided: protect against novel
+fixtures without making the robot useless under moderate sensor drift.
+
+The paper does not claim to solve sensor calibration. It makes the simpler
+point that unknown scores should be reported and stress-tested. A result that
+performs well only when residuals are perfectly calibrated is not ready for
+contact-rich manipulation.
+
+\section{Probe Budget And Damage Tradeoff}
+
+Probe actions have value because they can reduce posterior ambiguity before a
+release. They also have cost. They consume time, may require tool changes, and
+can cause damage if the probe is too aggressive. The full-scale suite models
+this by recording probe count, abstention, wrong release, damage, and utility
+separately. A policy that uses more probes is not automatically better; it is
+better only when the probes change the action decision enough to justify their
+cost.
+
+The limited-probe regime makes this tradeoff explicit. With few allowed
+diagnostic actions, a policy must decide whether the current belief is good
+enough for release. A reactive policy tends to commit too early. An
+over-abstaining policy refuses too often. Active probing tries to spend the
+available budget on probes that separate action-relevant hypotheses. For
+example, if the belief mass is split between bolt and latch, a twist or lateral
+probe is valuable. If the belief mass is split between adhesive and magnet, a
+thermal or slide probe is more valuable. If all plausible labels require tools
+that are unavailable, further probing may be pointless and abstention is the
+correct operational choice.
+
+\paragraph{Expected-value view.}
+Let $B$ be the current belief over fixtures and let $a$ be the best release
+under that belief. A probe is useful when it changes either the selected
+release or the decision to abstain. A probe that merely increases confidence in
+the same release has smaller value unless the confidence crosses a safety
+threshold. This is why probe selection should be tied to action semantics. The
+probe should reduce uncertainty about the next action, not only uncertainty
+about a label.
+
+In a high-damage regime, the value of information is larger because a wrong
+release is expensive. In a free-control regime, probing can be wasteful because
+direct action is often safe. In a sequential-fixture regime, probing after the
+first release can be valuable because the remaining constraint may differ from
+the first one. These regime differences explain why the paper reports
+regime-level winners rather than a single universal best policy.
+
+\paragraph{Why damage is not a secondary metric.}
+For manipulation, damage is not just another loss term. Damage can destroy the
+object, invalidate a repair, or create a safety hazard. A policy with higher
+nominal success but much higher damage may be unacceptable. The paper's main
+comparison therefore reports success, damage, wrong release, abstention,
+probes, utility, and oracle gap together. The guarded policy's main benefit is
+not maximum success; it is the reduction of damaging releases under unknown
+and ambiguous fixtures. The active-probe and POMDP-style policies improve the
+tradeoff by converting some abstentions and wrong releases into correct
+diagnoses.
+
+\section{Calibration Experiment Design}
+
+A real calibration experiment should be designed before deployment, not tuned
+after failures. The goal is to map bounded probe residuals to fixture
+posteriors, unknown scores, and release decisions. A minimal calibration set
+should include known examples for every fixture family, free-motion controls,
+near-boundary examples, out-of-taxonomy fixtures, tool-unavailable cases, and
+sensor-shift repeats. Without these controls, a high classification score can
+hide brittle behavior.
+
+\paragraph{Data collection.}
+For each fixture instance, the robot should execute the same bounded probes:
+a low-force pull, a lateral slide, a twist, a lift, and any fixture-specific
+safe probe such as heat or magnetic response. The robot should log raw force,
+torque, displacement, compliance, residual after each probe, and whether the
+probe changed the assembly. Ground truth should be assigned after inspection
+or disassembly. The label should include both fixture type and release action.
+If the fixture is outside the taxonomy or the release tool is missing, that
+fact should be recorded explicitly.
+
+\paragraph{Threshold selection.}
+Unknown thresholds should be selected on held-out boundary cases. A low
+threshold produces many abstentions; a high threshold forces novel fixtures
+into known labels. The operating point should be chosen based on the relative
+cost of abstention and damage. In a lab benchmark, abstention may be counted as
+failure. In a repair deployment, abstention may be preferable to tearing a
+cable or breaking a latch. The paper's utility function encodes one such
+choice, but deployment should report the raw metrics so different users can
+choose different operating points.
+
+\paragraph{Cross-condition validation.}
+Calibration should be checked across part geometry, fixture placement,
+material, tool wear, sensor bias, and operator setup. A hidden bolt in a thin
+plastic cover and a hidden bolt in a metal housing may have different residual
+magnitudes but similar action semantics. A useful fixture model should not
+overfit absolute force values when normalized relational residuals are more
+stable. Conversely, a model should not collapse distinct fixtures if their
+release actions differ. Cross-condition validation is how the representation
+claim becomes a deployment claim.
+
+\section{Operational Recovery After Abstention}
+
+Abstention is only useful if it triggers a recovery process. A robot that
+stops silently after every uncertain case is safe but not operationally
+helpful. The abstention output should therefore include a reason code, the
+best known hypotheses, the missing information, and the next recommended
+recovery step. The reason code might be out-of-taxonomy residual, low posterior
+margin, unavailable release action, unsafe probe budget, sensor anomaly, or
+sequential fixture suspected.
+
+\paragraph{Recovery actions.}
+A recovery action can be another bounded probe, a tool change, a new viewpoint,
+a human request, or task deferral. The choice depends on the reason code. If
+posterior margin is low between bolt and latch, a lateral diagnostic probe may
+resolve it. If the release action is unavailable, a tool change is needed. If
+the unknown score is high, a human should inspect the assembly or the task
+should be deferred. If sensor bias is suspected, recalibration is more useful
+than another release attempt.
+
+\paragraph{Human-readable reports.}
+The report should name the fixture hypothesis and the action consequence. A
+message such as ``low confidence'' is less useful than ``possible flexible
+restraint, cutter unavailable, direct pull unsafe.'' The latter gives a human
+or planner enough information to intervene. This is one practical advantage of
+latent fixture variables over opaque latent embeddings. The variable is
+interpretable because it points to a physical cause and a release action.
+
+\paragraph{Counting abstention honestly.}
+The paper treats abstention as neither success nor damage. It is a separate
+outcome. That separation is important for product decisions. A system with low
+damage and high abstention may be useful as an assistant that escalates hard
+cases. It may be unacceptable as an autonomous high-throughput system. A
+system with high success and high damage may look good in a success-only
+benchmark but fail safety review. Reporting abstention separately keeps both
+tradeoffs visible.
+
+\section{Release-Action Menu Checklist}
+
+Before claiming that latent fixture reasoning works on an assembly class, the
+release-action menu should be audited. The taxonomy should list every fixture
+the robot is expected to encounter. For each fixture, the menu should include
+at least one safe release action, the tool required by that action, the probes
+that distinguish it from nearby fixtures, and the damage modes caused by
+wrong releases. Missing any of these fields turns a classification problem
+into an unsafe planning problem.
+
+\begin{table}[h]
+\centering
+\caption{Release-action menu audit fields. The purpose is to connect fixture
+labels to executable and safe behavior.}
+\begin{tabular}{p{0.22\linewidth}p{0.66\linewidth}}
+\toprule
+Field & Required content \\
+\midrule
+Fixture label & Physical cause, such as bolt, latch, adhesive, stop, tie, or magnet. \\
+Release action & Semantic action that removes or bypasses the fixture. \\
+Required tool & Tool, end-effector, or environmental capability needed for release. \\
+Diagnostic probe & Bounded probe that separates the fixture from nearby alternatives. \\
+Unsafe confusion & Fixture pairs whose releases damage each other. \\
+Unknown trigger & Residual or menu condition that should force abstention. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The checklist is deliberately operational. It asks not whether the model can
+name a fixture in isolation, but whether the named fixture can be acted on
+safely. A known label with no release action should be treated like an
+unknown. A release action with no diagnostic probe should be treated as risky.
+A probe with no action consequence is scientifically interesting but not
+enough for this paper's claim.
+
+\section{Extended Result Interpretation}
+
+The aggregate results should be read as a set of mechanism tests rather than
+as a leaderboard. Geometry-only behavior is a negative control: it shows what
+happens when hidden fixtures are ignored. Nearest-fixture behavior tests
+whether a known taxonomy alone is enough. The posterior method tests whether
+soft belief over known classes helps. Guarded abstention tests whether
+unknown detection reduces damage. Active probing and POMDP-style belief test
+whether information gathering can improve the tradeoff. Oracle fixture
+knowledge estimates the remaining value of better fixture and release models.
+
+The main numbers match the intended hierarchy. Geometry-only succeeds in
+24.0\% of aggregate cases and has 68.9\% damage. Nearest known-taxonomy
+classification improves success to 31.6\% but still has 60.6\% damage,
+showing that forced labels are brittle. Guarded abstention reaches 44.0\%
+success and reduces damage to 33.3\%, but it abstains in 28.1\% of cases.
+Active probing reaches 51.6\% success by using more diagnostic information.
+The oracle reaches 93.1\% success and 0.3\% damage, which means the fixture
+abstraction has high potential but current inference and menu coverage remain
+far from ideal.
+
+No single number proves the paper's claim. The claim is supported by the
+pattern across controls. Unknown and partial-menu regimes punish forced
+classification. Free controls prevent the paper from claiming that every
+object needs hidden-fixture reasoning. Sequential fixtures show that one
+release may expose another constraint. Over-abstention shows that safety by
+refusal is not enough. Together, these controls define the scope of the
+representation.
+
+\section{Reproducibility And Audit Trail}
+
+The full-scale experiment is intentionally implemented with simple artifacts.
+The runner writes seed-level rows, aggregate rows, a JSON summary, a
+representative trace, table snippets, and small vector figures. It does not
+require a simulator server, GPU, or external plotting stack. This makes the
+experiment easier to audit. A reviewer can inspect the CSVs, recalculate
+means, check that the scale matches 8 families, 10 regimes, 12 methods, 80
+seeds, and 160 represented decisions per seed, and verify that the manuscript
+tables are generated from the same files.
+
+The RAM-light design is also part of the scientific claim. The suite does not
+need to store every represented decision. It stores compact seed summaries and
+only one explicit trace for qualitative inspection. This is sufficient because
+the experiment studies aggregate mechanism behavior across families, regimes,
+and policies. If a later version uses a physical simulator or robot logs, the
+same artifact pattern should remain: raw logs for selected traces, compact
+seed summaries for sweeps, aggregate tables, and a frozen build status file.
+
+The final submission should keep local build artifacts out of the canonical
+release location until the manuscript passes the page, text, and log checks.
+The final PDF should be copied to the downloads directory only after the
+paper is judged final. That rule prevents a stale short PDF from being mistaken
+for the completed paper.
+
+\section{Statistical Robustness Reading}
+
+The reported standard errors are not meant to imply that the synthetic suite
+samples from a natural distribution of all assemblies. The families and
+regimes are designed stress cases. The standard errors instead answer a
+narrower question: within the deterministic parameterized suite, are the
+method differences stable across seeds? This distinction matters. A small
+standard error does not prove that the same number will hold in a factory. It
+does show that the result is not driven by one lucky seed in the generated
+stress test.
+
+\paragraph{Seed variation.}
+The seed dimension changes residual noise, ambiguity realization, hidden
+fixture pressure, action-menu coverage, and boundary-case severity. A robust
+method should not win only on a single convenient seed. The aggregate rows
+therefore summarize each method across 80 seeds for every family and regime.
+When a policy's advantage persists across these seed changes, the mechanism is
+more credible. When a policy is sensitive to seed, the paper treats that as a
+deployment warning rather than smoothing it away.
+
+\paragraph{Family variation.}
+The family dimension tests whether a method depends on one fixture type.
+Geometry-only behavior fails broadly because hidden constraints are present in
+many families. Nearest-fixture classification improves over geometry in some
+known settings but is fragile for cable ties, magnets, dual fixtures, and
+partial action menus. Guarded and active policies are more stable because they
+can refuse or gather information when the residual does not support a safe
+release. The family summary is therefore more important than a single overall
+mean. It asks whether the method has the right failure shape.
+
+\paragraph{Regime variation.}
+The regime dimension changes the operating conditions. Low-noise known
+taxonomy is the favorable case. High noise, limited probes, high damage cost,
+ambiguous residuals, out-of-taxonomy fixtures, partial action menus, sensor
+bias, sequential fixtures, and free controls are all harder or qualitatively
+different. A policy that wins the favorable regime but collapses under unknown
+or partial-menu conditions is not submission-ready. The regime-winner table
+therefore acts like a stress map. It shows where the representation helps,
+where abstention is necessary, and where richer diagnosis is required.
+
+\paragraph{Interpreting the oracle.}
+The oracle is not an achievable deployed policy. It is an upper reference that
+knows the true fixture and correct release action. Its purpose is diagnostic.
+If the oracle were weak, the release-action abstraction would be suspect. If
+the oracle is strong while deployed policies are weak, the bottleneck is
+inference, unknown detection, probe choice, action-menu coverage, or
+calibration. In this suite the oracle is strong, so the correct interpretation
+is optimistic but bounded: fixture-aware action selection is valuable, but the
+current non-oracle policies still leave substantial performance on the table.
+
+\paragraph{Negative controls.}
+The free-fixture control is essential. Without it, the paper could accidentally
+reward policies that always suspect hidden constraints. A direct manipulation
+policy should be competitive when no hidden fixture exists. Likewise, the
+over-abstaining guard is a negative control for safety-only behavior. It shows
+that refusing too often can lower damage while also lowering usefulness. These
+controls prevent two false claims: that every object needs fixture diagnosis
+and that abstention alone is a complete solution.
+
+\paragraph{What would falsify the claim.}
+Several outcomes would weaken the paper. If nearest known-taxonomy
+classification matched guarded methods under unknown fixtures without higher
+damage, unknown detection would be less important. If geometry-only behavior
+matched latent methods under hidden fixtures, the fixture variable would add
+little. If the oracle were weak, the release-action abstraction would be
+insufficient. If free controls punished direct action, the suite would be
+biased toward hidden-fixture reasoning. The current results avoid these
+failure modes, which is why the final claim is worth making despite being
+synthetic.
+
+\section{Longer Closing Summary}
+
+Latent fixture reasoning is a small idea with large practical consequences.
+Robots often fail not because they lack motion primitives, but because they
+misunderstand what is holding the world still. A hidden bolt, latch, adhesive,
+stop, tie, or magnet is not just unmodeled geometry. It is a cause that changes
+which action is safe. Representing that cause explicitly makes failures more
+diagnosable and makes abstention meaningful.
+
+The v3 suite is intentionally synthetic, but it is broad enough to stress the
+mechanism. It shows known-taxonomy improvement, unknown-taxonomy failure,
+guarded abstention tradeoffs, active-probe gains, sequential-fixture weakness,
+free-control boundaries, and oracle calibration gaps. That is the final shape
+of the paper for this batch pass.
+
+\section{Final Sanity Checklist}
+
+Before final submission, the following checks should remain true:
+
+\begin{itemize}
+    \item The PDF contains the phrase ``v3 final full-scale.''
+    \item The PDF reports 12,288,000 represented decisions.
+    \item The main table reports geometry success 24.0\%, guarded damage
+    33.3\%, and oracle success 93.1\%.
+    \item The paper says no real robot validation.
+    \item The final PDF is at least 25 pages.
+    \item The final build removes local \texttt{main.pdf}.
+\end{itemize}
 
 \end{document}

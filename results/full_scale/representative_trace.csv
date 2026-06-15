@@ -1,0 +1,12 @@
+t,family,regime,method,action,belief_known_fixture,belief_unknown_fixture,unknown_score,decision
+0,cable_tie_unknown,out_of_taxonomy,nearest_fixture,probe,0.3078,0.1500,0.1500,continue_diagnosis
+1,cable_tie_unknown,out_of_taxonomy,nearest_fixture,probe,0.3618,0.1500,0.1500,continue_diagnosis
+2,cable_tie_unknown,out_of_taxonomy,nearest_fixture,release,0.3618,0.1500,0.1500,release
+0,cable_tie_unknown,out_of_taxonomy,guarded_abstention,probe,0.3208,0.2508,0.2508,continue_diagnosis
+1,cable_tie_unknown,out_of_taxonomy,guarded_abstention,probe,0.3871,0.3516,0.3516,continue_diagnosis
+2,cable_tie_unknown,out_of_taxonomy,guarded_abstention,probe,0.4550,0.4524,0.4524,continue_diagnosis
+3,cable_tie_unknown,out_of_taxonomy,guarded_abstention,abstain,0.4550,0.4524,0.4524,abstain
+0,cable_tie_unknown,out_of_taxonomy,oracle_fixture,probe,0.3432,0.2940,0.2940,continue_diagnosis
+1,cable_tie_unknown,out_of_taxonomy,oracle_fixture,probe,0.4304,0.4380,0.4380,continue_diagnosis
+2,cable_tie_unknown,out_of_taxonomy,oracle_fixture,probe,0.5197,0.5820,0.5820,continue_diagnosis
+3,cable_tie_unknown,out_of_taxonomy,oracle_fixture,abstain,0.5197,0.5820,0.5820,abstain

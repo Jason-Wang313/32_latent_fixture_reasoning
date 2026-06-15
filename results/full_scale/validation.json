@@ -1,0 +1,39 @@
+{
+  "paper": 32,
+  "version": "v3 final full-scale",
+  "validated_at": "2026-06-15",
+  "downloads_pdf": "C:/Users/wangz/Downloads/32.pdf",
+  "pages": 26,
+  "pdf_size_bytes": 338643,
+  "pdf_sha256": "966FB6334A0CD0CD0EF568AA65D7C6E2B8B17F8C08C44AAC8B1936B326D2454C",
+  "local_main_pdf_present_after_build": false,
+  "serious_build_log_matches": 0,
+  "required_pdf_text_present": [
+    "v3 final full-scale",
+    "12,288,000",
+    "33.3",
+    "93.1"
+  ],
+  "suite": {
+    "families": 8,
+    "regimes": 10,
+    "methods": 12,
+    "seeds": 80,
+    "steps_per_seed": 160,
+    "represented_decisions": 12288000,
+    "seed_rows": 76800,
+    "aggregate_rows": 960
+  },
+  "key_results": {
+    "geometry_success_rate": 0.23999636578222103,
+    "geometry_damage_rate": 0.6891118054047889,
+    "nearest_success_rate": 0.31558478863928435,
+    "nearest_damage_rate": 0.6059562532158452,
+    "guarded_success_rate": 0.4395601618084935,
+    "guarded_damage_rate": 0.33292624037249025,
+    "guarded_abstention_rate": 0.2807986683628723,
+    "active_probe_success_rate": 0.5161001470808002,
+    "oracle_success_rate": 0.9306812201131672,
+    "oracle_damage_rate": 0.002759661536774917
+  }
+}

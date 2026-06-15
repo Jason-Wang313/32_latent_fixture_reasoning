@@ -1,25 +1,24 @@
 # Submission Readiness Decision
 
-Decision: workshop-only / strong-revise.
+Decision: final full-scale synthetic mechanism paper; not a hardware-validated main empirical robotics paper.
 
-## Why Not Submit-Ready
+## Why This Is Now Submission-Hardened
 
-- Evidence is a toy simulator with synthetic residuals.
-- The fixture taxonomy and release-action menu are hand-coded.
-- V2 shows the mechanism fails on an out-of-taxonomy cable-tie fixture unless the robot abstains.
-- There is no hardware validation or high-fidelity assembly simulation.
-- There is no comparison to POMDP, active-perception, tactile-inference, or contact-rich manipulation baselines.
+- The manuscript is 26 pages and contains a full v3 argument rather than a short toy note.
+- The evaluation covers 8 fixture families, 10 regimes, 12 policies, 80 seeds, and 12,288,000 represented decisions.
+- The paper includes geometry-only, nearest known-taxonomy, guarded abstention, active probing, sequential diagnosis, POMDP-style belief, oracle, random probing, and over-abstention comparisons.
+- The stress tests include unknown fixtures, partial action menus, high damage cost, sensor bias, sequential fixtures, limited probes, ambiguous residuals, and free controls.
+- The manuscript reports separate success, damage, wrong-release, abstention, probe, utility, and oracle-gap metrics.
+- The final PDF is verified at `C:/Users/wangz/Downloads/32.pdf`.
 
-## Why Not Kill
+## Remaining Boundary
 
-- The latent-fixture variable is a clear robotics abstraction tied directly to safe action choice.
-- The positive toy result cleanly shows why visible geometry alone is incomplete for hidden fixtures.
-- The v2 stress makes the taxonomy boundary explicit rather than hiding it.
-- The narrowed claim is useful as a mechanism note.
+- The evidence is synthetic.
+- Fixture families and residual models are hand-designed.
+- There is no hardware validation.
+- There is no learned taxonomy or measured tactile calibration.
+- The POMDP-style baseline is synthetic and not a full solver over a real robot task.
 
-## Required Next Work
+## Final Supported Claim
 
-- Evaluate on real or high-fidelity hidden-fixture manipulation tasks.
-- Learn or calibrate fixture prototypes and unknown-fixture thresholds.
-- Compare against POMDP and active-perception baselines.
-- Add a diagnostic workflow for out-of-taxonomy abstentions.
+Latent fixture variables are useful action-selecting state abstractions for hidden-constraint manipulation, but only when taxonomy coverage, unknown detection, probe safety, release-action availability, and abstention are reported honestly.

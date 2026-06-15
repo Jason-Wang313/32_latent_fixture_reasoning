@@ -1,0 +1,56 @@
+{
+  "version": "v3 final full-scale",
+  "families": [
+    "visible_free_vs_hidden_bolt",
+    "latch_under_occlusion",
+    "adhesive_patch",
+    "hidden_stop_channel",
+    "cable_tie_unknown",
+    "magnetic_fixture",
+    "dual_fixture",
+    "fixture_absent_control"
+  ],
+  "regimes": [
+    "low_noise_known_taxonomy",
+    "high_noise_known_taxonomy",
+    "limited_probe_budget",
+    "high_damage_cost",
+    "ambiguous_residuals",
+    "out_of_taxonomy",
+    "partial_action_menu",
+    "sensor_bias",
+    "sequential_fixture",
+    "free_fixture_control"
+  ],
+  "methods": [
+    "geometry_only",
+    "reactive_after_failure",
+    "nearest_fixture",
+    "latent_fixture_posterior",
+    "guarded_abstention",
+    "active_probe_selection",
+    "sequential_diagnosis",
+    "pomdp_style_belief",
+    "generic_latent_classifier",
+    "oracle_fixture",
+    "over_abstaining_guard",
+    "random_probe_policy"
+  ],
+  "seeds": 80,
+  "steps_per_seed": 160,
+  "step_decisions": 12288000,
+  "aggregate_rows": 960,
+  "seed_rows": 76800,
+  "key_results": {
+    "geometry_success_rate": 0.23999636578222103,
+    "nearest_success_rate": 0.31558478863928435,
+    "latent_success_rate": 0.4235640427322686,
+    "guarded_success_rate": 0.4395601618084935,
+    "active_probe_success_rate": 0.5161001470808002,
+    "oracle_success_rate": 0.9306812201131672,
+    "nearest_damage_rate": 0.6059562532158452,
+    "guarded_damage_rate": 0.33292624037249025,
+    "guarded_abstention_rate": 0.2807986683628723,
+    "oracle_utility_cost": 0.4157419099779914
+  }
+}
