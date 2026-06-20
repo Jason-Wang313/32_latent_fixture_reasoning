@@ -147,3 +147,7 @@ Paper32 is not final until all of the following are true:
 - Local `main.pdf` is removed after final build.
 - Docs and status files describe v3, not stale v2 results.
 - Commit is pushed and local HEAD matches upstream.
+On 2026-06-20, the final PDF was rebuilt with the VLA role-model hyperref box
+policy. The rebuilt artifact has SHA256
+`25EF23258F386553576BB28E4D12DB41A91852CB3D19E78B1A5480E4A33155EF` and
+VLA-style one-point red internal link boxes on pages 4 and 5.

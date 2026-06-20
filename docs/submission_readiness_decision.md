@@ -10,6 +10,7 @@ Decision: final full-scale synthetic mechanism paper; not a hardware-validated m
 - The stress tests include unknown fixtures, partial action menus, high damage cost, sensor bias, sequential fixtures, limited probes, ambiguous residuals, and free controls.
 - The manuscript reports separate success, damage, wrong-release, abstention, probe, utility, and oracle-gap metrics.
 - The final PDF is verified at `C:/Users/wangz/Downloads/32.pdf`.
+- The delivered PDF was rendered and visually inspected, including VLA-style red internal link boxes on pages 4 and 5.
 
 ## Remaining Boundary
 

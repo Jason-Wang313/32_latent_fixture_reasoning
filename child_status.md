@@ -24,8 +24,9 @@ V3 full-scale hardening time: 2026-06-15
 
 - Downloads PDF: `C:/Users/wangz/Downloads/32.pdf`
 - Pages: 26
-- Size: 338,643 bytes
-- SHA256: `966FB6334A0CD0CD0EF568AA65D7C6E2B8B17F8C08C44AAC8B1936B326D2454C`
+- Size: 395,494 bytes
+- SHA256: `25EF23258F386553576BB28E4D12DB41A91852CB3D19E78B1A5480E4A33155EF`
+- Latest visual hardening: VLA-style one-point red internal link boxes verified on pages 4 and 5; green cite/url border policy configured, with no cite/url annotations present in this manuscript.
 - Desktop PDF: absent
 - Local paper PDF: absent after final build
 - GitHub URL: `https://github.com/Jason-Wang313/32_latent_fixture_reasoning`

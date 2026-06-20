@@ -1,13 +1,24 @@
 {
   "paper": 32,
   "version": "v3 final full-scale",
-  "validated_at": "2026-06-15",
+  "validated_at": "2026-06-20",
   "downloads_pdf": "C:/Users/wangz/Downloads/32.pdf",
   "pages": 26,
-  "pdf_size_bytes": 338643,
-  "pdf_sha256": "966FB6334A0CD0CD0EF568AA65D7C6E2B8B17F8C08C44AAC8B1936B326D2454C",
+  "pdf_size_bytes": 395494,
+  "pdf_sha256": "25EF23258F386553576BB28E4D12DB41A91852CB3D19E78B1A5480E4A33155EF",
   "local_main_pdf_present_after_build": false,
   "serious_build_log_matches": 0,
+  "vla_link_box_visual_hardening": {
+    "verified": true,
+    "link_pages": [[4, 1], [5, 1]],
+    "colors": {
+      "red": 2,
+      "green": 0,
+      "cyan": 0
+    },
+    "border": [0, 0, 1],
+    "note": "The manuscript has internal reference links only; green cite/url boxes are configured by hyperref policy but no cite/url link annotations are present."
+  },
   "required_pdf_text_present": [
     "v3 final full-scale",
     "12,288,000",
