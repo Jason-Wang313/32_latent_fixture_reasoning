@@ -8,11 +8,12 @@
 - [x] Figure directory is `figures/full_scale/`.
 - [x] Final PDF path is `C:/Users/wangz/Downloads/32.pdf`.
 - [x] Final PDF has 26 pages.
-- [x] Final PDF SHA256 is `966FB6334A0CD0CD0EF568AA65D7C6E2B8B17F8C08C44AAC8B1936B326D2454C`.
+- [x] Final PDF SHA256 is `25EF23258F386553576BB28E4D12DB41A91852CB3D19E78B1A5480E4A33155EF`.
 - [x] Local `main.pdf` is removed after canonical copy.
 - [x] Visible Desktop PDF copies are absent.
 - [x] Build status is written locally to ignored `data/build_status.json`.
 - [x] Stable validation facts are recorded in `results/full_scale/validation.json`.
+- [x] VLA-style link-box policy is configured in `main.tex`; final PDF has one-point red internal reference boxes and no cyan boxes.
 
 Recommended verification commands:
 

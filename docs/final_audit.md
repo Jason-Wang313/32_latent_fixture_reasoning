@@ -16,5 +16,6 @@
 14. Submission-readiness judgment: final full-scale synthetic mechanism paper; not a hardware-validated robotics result.
 15. Final PDF path: `C:/Users/wangz/Downloads/32.pdf`
 16. Final PDF pages: 26
-17. Final PDF SHA256: `966FB6334A0CD0CD0EF568AA65D7C6E2B8B17F8C08C44AAC8B1936B326D2454C`
+17. Final PDF SHA256: `25EF23258F386553576BB28E4D12DB41A91852CB3D19E78B1A5480E4A33155EF`
 18. Local paper PDF: absent after final build; only the canonical Downloads copy is retained.
+19. Final visual check: the delivered PDF was rendered with `pdftoppm` and inspected through link-page contact sheets. VLA-style one-point red internal link boxes were verified on pages 4 and 5, with no cyan boxes.
